@@ -15,6 +15,7 @@ dependencies = [
     "pydantic-settings>=2.16.2",
     "pyjwt>=2.15.1",
     "python-multipart>=0.0.33",
+    "reportlab>=5.1.0",
     "sqlalchemy>=2",
     "uvicorn[standard]>=0.54.0",
 ]
@@ -43,5 +44,6 @@ select = ["E", "F", "I", "B", "UP", "S"]
 ignore = ["B008"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "S105", "S106", "F811"]  # F811: shared pytest fixtures are imported
+"tests/*" = ["S101", "S105", "S106", "F811", "E501"]  # F811: shared pytest fixtures are imported
+"app/services/pdf_reports.py" = ["E501"]  # long report copy and table definitions
 "app/sample_data.py" = ["S311"]

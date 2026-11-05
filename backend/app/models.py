@@ -494,6 +494,33 @@ class Alert(TimestampMixin, Base):
     resolved_by: Mapped[User | None] = relationship(foreign_keys=[resolved_by_id])
 
 
+class ReportRun(Base):
+    """History of generated reports/exports. The documents themselves are not stored."""
+
+    __tablename__ = "report_runs"
+    __table_args__ = (
+        CheckConstraint("format IN ('csv', 'pdf')", name="format_valid"),
+        CheckConstraint("status IN ('success', 'failed')", name="status_valid"),
+        CheckConstraint("row_count IS NULL OR row_count >= 0", name="row_count_non_negative"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    report_type: Mapped[str] = mapped_column(String(40), index=True)
+    format: Mapped[str] = mapped_column(String(10))
+    status: Mapped[str] = mapped_column(String(10))
+    filters: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    row_count: Mapped[int | None] = mapped_column(Integer)
+    error: Mapped[str | None] = mapped_column(String(255))
+    requested_by_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+    requested_by: Mapped[User | None] = relationship()
+
+
 class AuditEvent(Base):
     __tablename__ = "audit_events"
     __table_args__ = (Index("ix_audit_events_entity", "entity_type", "entity_id"),)

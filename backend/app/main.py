@@ -13,6 +13,7 @@ from .routers import (
     fleet,
     incidents,
     loading,
+    reports,
     system,
 )
 
@@ -41,6 +42,7 @@ def create_app() -> FastAPI:
     app.include_router(incidents.router)
     app.include_router(alerts.router)
     app.include_router(analytics.router)
+    app.include_router(reports.router)
     return app
 
 
