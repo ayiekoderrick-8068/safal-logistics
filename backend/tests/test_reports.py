@@ -415,9 +415,19 @@ def test_pdf_reports_generate(auth_client, ids, report) -> None:
 
 def test_history_lists_own_runs(auth_client, client, make_user, ids) -> None:
     auth_client.get(f"/api/reports/export/executive.pdf?{Q}")
+    auth_client.get(f"/api/reports/export/turnaround.csv?{Q}")
+    auth_client.get(f"/api/reports/export/turnaround.pdf?{Q}")
     h = auth_client.get("/api/reports/history").json()
-    assert h[0]["report_type"] == "executive" and h[0]["title"] == "Executive Operations Summary"
-    assert h[0]["format"] == "pdf" and h[0]["requested_by"] == "Derrick"
+    assert [(x["title"], x["format"]) for x in h] == [
+        ("Truck Turnaround Performance", "pdf"),
+        ("Loading turnaround records", "csv"),
+        ("Executive Operations Summary", "pdf"),
+    ]
+    assert h[1]["row_count"] == 3 and h[0]["requested_by"] == "Derrick"
+    # Other users do not see this user's report activity.
+    make_user("other", role=Role.OPERATIONS)
+    client.post("/api/auth/login", json={"username": "other", "password": TEST_PASSWORD})
+    assert client.get("/api/reports/history").json() == []
 
 
 # ---------------------------------------------------------------- permissions

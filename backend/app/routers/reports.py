@@ -209,7 +209,7 @@ def history(
         ReportRunOut(
             id=r.id,
             report_type=r.report_type,
-            title=REPORTS.get(r.report_type) or DATASETS.get(r.report_type, r.report_type),
+            title=(REPORTS if r.format == "pdf" else DATASETS).get(r.report_type, r.report_type),
             format=r.format,
             status=r.status,
             filters=r.filters,
