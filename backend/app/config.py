@@ -43,8 +43,13 @@ class Settings(BaseSettings):
     login_window_minutes: int = Field(default=15, ge=1, le=1440)
     login_lockout_minutes: int = Field(default=15, ge=1, le=1440)
 
-    # Alerts are re-evaluated on read at most this often (seconds).
+    # Alerts are re-evaluated on read at most this often (seconds). With the background
+    # worker running, read-time refresh can be switched off (it is only a fallback).
     alert_refresh_seconds: int = Field(default=60, ge=0)
+    alert_refresh_on_read: bool = True
+    # Background worker cadence (python -m app.worker).
+    worker_interval_seconds: int = Field(default=60, ge=5, le=3600)
+    worker_max_backoff_seconds: int = Field(default=600, ge=5, le=86_400)
 
     @model_validator(mode="after")
     def _apply_database_name(self) -> Settings:

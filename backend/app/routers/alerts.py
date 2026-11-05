@@ -7,6 +7,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, joinedload
 
 from ..audit import record_event
+from ..config import get_settings
 from ..db import get_db
 from ..deps import get_current_user, require_roles
 from ..models import Alert, AlertSeverity, AlertStatus, AlertType, Role, User
@@ -20,6 +21,27 @@ Reader = Annotated[User, Depends(get_current_user)]
 Staff = Annotated[
     User, Depends(require_roles(Role.OPERATIONS, Role.FLEET_MANAGER, Role.COMPLIANCE))
 ]
+
+
+def _refresh_on_read(db: Session) -> None:
+    """Fallback refresh when no worker runs.
+
+    Throttled; disable with LOGITRACK_ALERT_REFRESH_ON_READ=false once the worker is running.
+    """
+    if get_settings().alert_refresh_on_read:
+        refresh_alerts(db)
+
+
+class WorkerStatus(BaseModel):
+    configured_interval_seconds: int
+    refresh_on_read: bool
+    last_run_at: datetime | None
+    last_success_at: datetime | None
+    status: str  # ok | failed | stale | never_run
+    consecutive_failures: int
+    last_error: str | None
+    last_stats: dict[str, int] | None
+
 
 _SEVERITY_ORDER = case(
     {AlertSeverity.CRITICAL.value: 0, AlertSeverity.WARNING.value: 1}, value=Alert.severity, else_=2
@@ -106,7 +128,7 @@ def list_alerts(
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ) -> Page[AlertOut]:
-    refresh_alerts(db)
+    _refresh_on_read(db)
     query = select(Alert)
     if status_ == "active":
         query = query.where(Alert.status != AlertStatus.RESOLVED)
@@ -136,7 +158,7 @@ def list_alerts(
 
 @router.get("/summary", response_model=AlertSummary)
 def summary(db: DB, _: Reader) -> AlertSummary:
-    refresh_alerts(db)
+    _refresh_on_read(db)
     rows = dict(
         db.execute(
             select(Alert.severity, func.count(Alert.id))
@@ -167,6 +189,32 @@ def summary(db: DB, _: Reader) -> AlertSummary:
 @router.post("/refresh")
 def force_refresh(db: DB, _: Staff) -> dict[str, int]:
     return refresh_alerts(db, force=True)
+
+
+@router.get("/worker-status", response_model=WorkerStatus)
+def worker_status(db: DB, _: Reader) -> WorkerStatus:
+    from ..services.app_settings import get_setting
+    from ..worker import HEARTBEAT_KEY
+
+    s = get_settings()
+    hb = get_setting(db, HEARTBEAT_KEY) or {}
+    last_run = datetime.fromisoformat(hb["last_run_at"]) if hb.get("last_run_at") else None
+    status = hb.get("status", "never_run")
+    # More than three missed intervals without a run means the worker is not running.
+    if last_run and (utcnow() - last_run).total_seconds() > 3 * s.worker_interval_seconds:
+        status = "stale"
+    return WorkerStatus(
+        configured_interval_seconds=s.worker_interval_seconds,
+        refresh_on_read=s.alert_refresh_on_read,
+        last_run_at=last_run,
+        last_success_at=datetime.fromisoformat(hb["last_success_at"])
+        if hb.get("last_success_at")
+        else None,
+        status=status,
+        consecutive_failures=hb.get("consecutive_failures", 0),
+        last_error=hb.get("last_error"),
+        last_stats=hb.get("last_stats"),
+    )
 
 
 @router.post("/{alert_id}/acknowledge", response_model=AlertOut)

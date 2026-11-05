@@ -248,6 +248,38 @@ Every write is checked on the server; the UI only hides buttons as a convenience
 
 Full interactive documentation: http://localhost:8090/docs.
 
+## Background worker
+
+Scheduled checks run in a separate process, so alerts stay current even when nobody has the
+app open. Each run checks compliance expiry and missing documents, inspections due,
+maintenance, loading over target, missed dispatch times, overdue deliveries and unresolved
+delays, and cleans up expired sign-in counters.
+
+```bash
+# Local: second terminal, same .env as the API
+cd backend && uv run python -m app.worker            # every LOGITRACK_WORKER_INTERVAL_SECONDS (60)
+cd backend && uv run python -m app.worker --once     # single run (cron / external scheduler)
+```
+
+**Production.** Run it as a supervised service beside the API. An example systemd unit is in
+`backend/deploy/logitrack-worker.service` (`Restart=always`, logs in `journalctl`). On
+platforms without long-running services, schedule `python -m app.worker --once` every
+minute instead.
+
+**Reliability:**
+- **No duplicates:** alerts are deduplicated by the database, and a PostgreSQL advisory lock
+  stops overlapping runs. Several workers, retries or the read-time fallback never create
+  duplicates.
+- **Failures:** each one is logged with a traceback and retried with exponential backoff
+  (60 s → 120 s → … up to `LOGITRACK_WORKER_MAX_BACKOFF_SECONDS`, 600 s).
+- **Shutdown:** SIGTERM finishes the current run and exits.
+- **Monitoring:** every run writes a heartbeat, visible on the Alerts page and at
+  `GET /api/alerts/worker-status` (`ok`, `failed`, `stale` after three missed intervals, or
+  `never_run`).
+- **Read-time fallback:** alerts are also refreshed when pages load (at most once a minute).
+  Once the worker is deployed, set `LOGITRACK_ALERT_REFRESH_ON_READ=false` so reads never
+  write.
+
 ## Operational reporting (Milestone 4)
 
 Open **Reports** in the sidebar. A single set of filters drives every KPI, chart, table and

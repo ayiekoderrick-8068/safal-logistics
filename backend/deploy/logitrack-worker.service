@@ -1,0 +1,26 @@
+# Example systemd unit for the LogiTrack background worker (production).
+# Install: copy to /etc/systemd/system/, adjust paths/user, then
+#   sudo systemctl daemon-reload && sudo systemctl enable --now logitrack-worker
+# Logs:    journalctl -u logitrack-worker -f
+[Unit]
+Description=LogiTrack background worker (alerts and housekeeping)
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=logitrack
+WorkingDirectory=/opt/logitrack/backend
+# Same environment as the API (database URL, JWT secret, timezone ...).
+EnvironmentFile=/opt/logitrack/.env
+ExecStart=/opt/logitrack/backend/.venv/bin/python -m app.worker
+Restart=always
+RestartSec=10
+# The worker finishes the current run and exits on SIGTERM.
+KillSignal=SIGTERM
+TimeoutStopSec=60
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

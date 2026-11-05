@@ -59,6 +59,35 @@ function ResolveModal({ alert, onClose, onSaved }: { alert: OpsAlert; onClose: (
   )
 }
 
+interface WorkerStatus {
+  configured_interval_seconds: number
+  refresh_on_read: boolean
+  last_run_at: string | null
+  status: 'ok' | 'failed' | 'stale' | 'never_run'
+  consecutive_failures: number
+  last_error: string | null
+}
+
+function WorkerStatusNote({ version }: { version: number }) {
+  const { data } = useApi<WorkerStatus>(`/alerts/worker-status?v=${version}`)
+  if (!data) return null
+  const healthy = data.status === 'ok'
+  const text = healthy
+    ? `Background checks run every ${data.configured_interval_seconds} s · last run ${formatDateTime(data.last_run_at)}`
+    : data.status === 'failed'
+      ? `Background checks are failing (${data.consecutive_failures} in a row) — retrying automatically. ${data.last_error ?? ''}`
+      : data.status === 'stale'
+        ? `Background worker has not run since ${formatDateTime(data.last_run_at)}.`
+        : 'Background worker has not run yet.'
+  return (
+    <p role="status" data-testid="worker-status"
+      className={`mb-4 rounded-xl px-4 py-2 text-sm ${healthy ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-900'}`}>
+      {text}
+      {!healthy && data.refresh_on_read && ' Alerts are still refreshed whenever pages load.'}
+    </p>
+  )
+}
+
 export function AlertsPage() {
   const { hasRole } = useAuth()
   const canAct = hasRole('operations', 'fleet_manager', 'compliance')
@@ -104,6 +133,7 @@ export function AlertsPage() {
           </button>
         )}
       />
+      <WorkerStatusNote version={version} />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={CircleAlert} tone="red" label="Critical" value={formatNumber(s?.critical)} note="Open, needs action" />
         <StatCard icon={TriangleAlert} tone="amber" label="Warning" value={formatNumber(s?.warning)} note="Open" />
