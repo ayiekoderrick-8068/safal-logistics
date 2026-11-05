@@ -56,6 +56,7 @@ test('every sidebar module opens a real page, and sign-out works', async ({ page
     ['Dispatch', 'Dispatch Management'],
     ['Turnaround Analytics', 'Turnaround-Time Analytics'],
     ['Compliance', 'Compliance Records'],
+    ['Delay Reports', 'Delay Reports'],
     ['Reports', 'Reports & Export'],
   ]
   for (const [link, heading] of modules) {

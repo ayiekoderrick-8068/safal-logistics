@@ -18,7 +18,6 @@ from sqlalchemy.orm import Session
 
 from ..config import get_settings
 from ..models import (
-    ComplianceDocument,
     DelayIncident,
     Dispatch,
     DispatchStatus,
@@ -185,40 +184,33 @@ def _round(v: float | None) -> float | None:
 
 
 def compliance_by_truck(db: Session, truck_ids: list[int]) -> dict[int, ComplianceSummary]:
-    """Latest document per (truck, type) -> overall status: overdue > expiring > valid."""
-    result: dict[int, ComplianceSummary] = {}
+    """Summarise each truck's compliance using the configurable rules in services.compliance."""
+    from .compliance import evaluate_trucks  # local import avoids a cycle
+
     if not truck_ids:
-        return result
-    today = local_today()
-    latest = (
-        select(
-            ComplianceDocument.truck_id, ComplianceDocument.doc_type, ComplianceDocument.expires_on
-        )
-        .where(ComplianceDocument.truck_id.in_(truck_ids))
-        .ext(distinct_on(ComplianceDocument.truck_id, ComplianceDocument.doc_type))
-        .order_by(
-            ComplianceDocument.truck_id,
-            ComplianceDocument.doc_type,
-            ComplianceDocument.expires_on.desc(),
-        )
-    )
-    soonest: dict[int, tuple] = {}
-    for truck_id, doc_type, expires_on in db.execute(latest):
-        if truck_id not in soonest or expires_on < soonest[truck_id][1]:
-            soonest[truck_id] = (doc_type, expires_on)
-    for truck_id in truck_ids:
-        if truck_id not in soonest:
-            result[truck_id] = ComplianceSummary(status="missing")
-            continue
-        doc_type, expires_on = soonest[truck_id]
-        if expires_on < today:
+        return {}
+    trucks = list(db.scalars(select(Truck).where(Truck.id.in_(truck_ids))))
+    evaluated = evaluate_trucks(db, trucks, local_today())
+    result: dict[int, ComplianceSummary] = {}
+    for truck_id, tc in evaluated.items():
+        dated = [i for i in tc.items if i.document is not None]
+        soonest = min(dated, key=lambda i: i.document.expires_on) if dated else None  # type: ignore[union-attr]
+        expired = any(i.state == "expired" and i.mandatory for i in tc.items)
+        missing = any(i.state == "missing" for i in tc.items)
+        if expired:
             state = "overdue"
-        elif expires_on <= today + timedelta(days=EXPIRY_WINDOW_DAYS):
+        elif missing:
+            state = "missing"
+        elif tc.status == "expiring":
             state = "expiring"
         else:
             state = "valid"
         result[truck_id] = ComplianceSummary(
-            status=state, next_expiry=expires_on, next_expiry_type=doc_type
+            status=state,
+            next_expiry=soonest.document.expires_on if soonest else None,  # type: ignore[union-attr]
+            next_expiry_type=soonest.doc_type if soonest else None,
+            eligible=tc.eligible,
+            issues=tc.blockers,
         )
     return result
 

@@ -13,7 +13,6 @@ from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import ColumnElement, func, select
-from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.orm import Session
 
 from ..config import get_settings
@@ -256,16 +255,8 @@ def build_overview(db: Session, start: date, end: date) -> DashboardOverview:
     ]
 
     # Only the most recent document per truck & type counts (older ones were renewed).
-    latest = (
-        select(ComplianceDocument)
-        .ext(distinct_on(ComplianceDocument.truck_id, ComplianceDocument.doc_type))
-        .order_by(
-            ComplianceDocument.truck_id,
-            ComplianceDocument.doc_type,
-            ComplianceDocument.expires_on.desc(),
-        )
-        .subquery()
-    )
+    # Current (non-superseded) documents only; renewed ones are history.
+    latest = select(ComplianceDocument).where(ComplianceDocument.superseded_at.is_(None)).subquery()
     today = datetime.now(tz).date()
     alerts = [
         ExpiryAlert(

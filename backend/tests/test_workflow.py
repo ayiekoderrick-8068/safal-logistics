@@ -17,6 +17,22 @@ def iso(dt: datetime) -> str:
     return dt.isoformat()
 
 
+def add_valid_documents(c: TestClient, truck_id: int, types=("insurance", "licence", "inspection")):
+    today = datetime.now(UTC).date()
+    for doc_type in types:
+        r = c.post(
+            "/api/compliance/documents",
+            json={
+                "truck_id": truck_id,
+                "doc_type": doc_type,
+                "reference_number": f"{doc_type}-001",
+                "issued_on": str(today - timedelta(days=30)),
+                "expires_on": str(today + timedelta(days=300)),
+            },
+        )
+        assert r.status_code == 201, r.text
+
+
 @pytest.fixture
 def now() -> datetime:
     return datetime.now(UTC).replace(microsecond=0)
@@ -50,6 +66,8 @@ def setup(auth_client: TestClient) -> dict[str, int]:
         },
     )
     assert route.status_code == 201, route.text
+    # Mandatory compliance documents (insurance, vehicle licence, inspection) so it can dispatch.
+    add_valid_documents(c, truck.json()["id"])
     return {
         "driver": driver.json()["id"],
         "truck": truck.json()["id"],
@@ -86,7 +104,8 @@ def test_reference_data_is_normalised(auth_client, setup) -> None:
     truck = auth_client.get(f"/api/trucks/{setup['truck']}").json()
     assert truck["registration"] == "KCA 204T"
     assert truck["driver"]["label"] == "James Otieno"
-    assert truck["compliance"]["status"] == "missing"
+    assert truck["compliance"]["status"] == "valid"
+    assert truck["compliance"]["eligible"] is True
     routes = auth_client.get("/api/routes").json()
     assert routes[0]["label"] == "Nairobi → Nakuru"
     assert auth_client.get("/api/bays").json()[0]["code"] == "BAY-01"

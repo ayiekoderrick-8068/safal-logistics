@@ -14,6 +14,7 @@ dependencies = [
     "psycopg[binary]>=3.3.8",
     "pydantic-settings>=2.16.2",
     "pyjwt>=2.15.1",
+    "python-multipart>=0.0.33",
     "sqlalchemy>=2",
     "uvicorn[standard]>=0.54.0",
 ]

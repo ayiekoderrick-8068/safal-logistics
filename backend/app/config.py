@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from pydantic import Field, model_validator
@@ -31,6 +32,13 @@ class Settings(BaseSettings):
     bay_operating_hours_per_day: int = Field(default=12, gt=0, le=24)
     # Minutes of lateness tolerated before a load/delivery counts as delayed.
     delay_grace_minutes: int = Field(default=15, ge=0, le=240)
+
+    # Compliance document storage (outside any web root; files are served only via the API).
+    upload_dir: Path = Path(__file__).resolve().parents[1] / "var" / "uploads"
+    max_upload_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
+
+    # Alerts are re-evaluated on read at most this often (seconds).
+    alert_refresh_seconds: int = Field(default=60, ge=0)
 
     @model_validator(mode="after")
     def _apply_database_name(self) -> Settings:

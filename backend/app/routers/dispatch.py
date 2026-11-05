@@ -33,6 +33,7 @@ from ..schemas_ops import (
     ScheduleOut,
 )
 from ..services.app_settings import is_sample_data
+from ..services.compliance import dispatch_blockers
 from ..services.dashboard import local_bounds
 from ..services.operations import (
     commit,
@@ -141,6 +142,25 @@ def create_dispatch(body: DispatchIn, request: Request, db: DB, user: OpsWriter)
     route = db.get(Route, body.route_id)
     if route is None or not route.is_active:
         raise invalid("Route not found or inactive")
+
+    # Compliance & availability are re-validated here, at the moment of dispatch, on the
+    # server: a client cannot bypass them and a document that lapsed after booking blocks.
+    # The row lock serialises against a concurrent status change of the same truck.
+    db.execute(select(Truck.id).where(Truck.id == schedule.truck_id).with_for_update())
+    blockers = dispatch_blockers(db, schedule.truck, local_today())
+    if blockers:
+        record_event(
+            db,
+            action="dispatch.blocked",
+            entity_type="loading_schedule",
+            entity_id=schedule.id,
+            actor=user,
+            request=request,
+            summary=f"Dispatch of {schedule.truck.registration} blocked",
+            changes={"reasons": blockers},
+        )
+        db.commit()
+        raise conflict(f"Dispatch blocked for {schedule.truck.registration}: " + " ".join(blockers))
 
     at = not_in_future(body.dispatched_at or utcnow(), "Dispatch time")
     if schedule.loading_finished_at and at < schedule.loading_finished_at:

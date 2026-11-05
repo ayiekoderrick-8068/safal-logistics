@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# Uploaded compliance files (local storage)
+backend/var/
+
 # Python
 __pycache__/
 *.py[cod]

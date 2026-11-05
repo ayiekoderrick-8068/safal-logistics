@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .models import (
+    Alert,
     AuditEvent,
     ComplianceDocument,
     DelayCause,
@@ -87,7 +88,15 @@ def _has_operational_data(db: Session) -> bool:
 def clear_sample_data(db: Session) -> None:
     if not is_sample_data(db):
         raise RuntimeError("Refusing to clear: the database is not marked as sample data.")
+    file_keys = list(
+        db.scalars(
+            select(ComplianceDocument.storage_key).where(
+                ComplianceDocument.storage_key.is_not(None)
+            )
+        )
+    )
     for model in (
+        Alert,
         DelayIncident,
         Dispatch,
         LoadingSchedule,
@@ -101,6 +110,10 @@ def clear_sample_data(db: Session) -> None:
     db.execute(delete(AuditEvent).where(AuditEvent.action == "sample_data.loaded"))
     delete_setting(db, SAMPLE_DATA_KEY)
     db.commit()
+    from .services.storage import delete as delete_file
+
+    for key in file_keys:
+        delete_file(key)
 
 
 def load_sample_data(db: Session, today: date | None = None, seed: int = 2026) -> dict[str, int]:
@@ -261,8 +274,14 @@ def load_sample_data(db: Session, today: date | None = None, seed: int = 2026) -
 
     trucks[-1].status = TruckStatus.MAINTENANCE
 
+    authorities = {
+        DocumentType.INSURANCE: "Sample Insurer Ltd",
+        DocumentType.LICENCE: "NTSA (sample)",
+        DocumentType.INSPECTION: "NTSA Motor Vehicle Inspection (sample)",
+        DocumentType.ROADWORTHY: "NTSA (sample)",
+    }
     for truck in trucks:
-        for doc_type in DocumentType:
+        for doc_type in authorities:
             expires = today + timedelta(
                 days=rng.choice(
                     [rng.randint(-20, -1)] * 1
@@ -275,6 +294,7 @@ def load_sample_data(db: Session, today: date | None = None, seed: int = 2026) -
                     truck=truck,
                     doc_type=doc_type,
                     reference_number=f"{doc_type.value[:3].upper()}-{rng.randint(10000, 99999)}",
+                    issuing_authority=authorities[doc_type],
                     issued_on=expires - timedelta(days=365),
                     expires_on=expires,
                     notes="Sample document",

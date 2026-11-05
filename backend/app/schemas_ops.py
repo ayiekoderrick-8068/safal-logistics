@@ -111,6 +111,8 @@ class ComplianceSummary(BaseModel):
     status: Literal["valid", "expiring", "overdue", "missing"]
     next_expiry: date | None = None
     next_expiry_type: DocumentType | None = None
+    eligible: bool = True
+    issues: list[str] = []
 
 
 class TruckOut(BaseModel):

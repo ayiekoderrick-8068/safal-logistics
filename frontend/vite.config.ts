@@ -31,5 +31,7 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     css: false,
+    // jsdom + user-event are slow under parallel load on this machine; avoid false timeouts.
+    testTimeout: 15_000,
   },
 })

@@ -114,14 +114,6 @@ export const NAV: NavSection[] = [
       {
         to: '/compliance', label: 'Compliance', title: 'Compliance Records', icon: ShieldCheck,
         description: 'Vehicle documents, inspections and renewals.',
-        planned: {
-          milestone: 'Milestone 4',
-          features: [
-            'Track insurance, licences, inspections and roadworthiness',
-            'Upcoming-expiry alerts',
-            'Changes restricted to Compliance and Admin roles, with audit trail',
-          ],
-        },
       },
       {
         to: '/finance', label: 'Finance', title: 'Finance', icon: Wallet,

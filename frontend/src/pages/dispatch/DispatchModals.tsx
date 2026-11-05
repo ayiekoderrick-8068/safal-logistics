@@ -11,7 +11,8 @@ import { useApi } from '../../hooks/useApi'
 import { api, ApiError } from '../../lib/api'
 import { DELAY_CAUSE_LABELS, formatDateTime, formatDuration } from '../../lib/format'
 import { formatClock, isValidZonedInput, minutesBetween, toZonedInput, zonedInputToIso } from '../../lib/time'
-import type { DelayCause, Dispatch, Route, Schedule } from '../../lib/types'
+import { Link } from 'react-router'
+import type { DelayCause, Dispatch, Eligibility, Route, Schedule } from '../../lib/types'
 
 const CAUSES = Object.entries(DELAY_CAUSE_LABELS) as [DelayCause, string][]
 
@@ -103,6 +104,7 @@ function NewDispatchForm({ scheduleId, onClose, onSaved, ready, routes }: NewDis
         <Field id="dispatch-at" label="Departure time (EAT)" error={errors.dispatched_at?.message}>
           <input type="datetime-local" {...a11y('dispatch-at', errors.dispatched_at?.message)} {...register('dispatched_at')} className={inputClass} />
         </Field>
+        {schedule && <EligibilityNotice truckId={schedule.truck.id} />}
         {schedule && departureIso && schedule.arrival_at && (
           <dl className="grid grid-cols-2 gap-3 rounded-xl bg-surface-muted p-3 text-sm" aria-live="polite">
             <div>
@@ -120,6 +122,19 @@ function NewDispatchForm({ scheduleId, onClose, onSaved, ready, routes }: NewDis
         )}
         <FormActions submitLabel="Dispatch truck" submitting={isSubmitting} onCancel={onClose} />
       </form>
+  )
+}
+
+/** Pre-flight view of the server-side dispatch gate (the server re-checks on submit). */
+function EligibilityNotice({ truckId }: { truckId: number }) {
+  const { data } = useApi<Eligibility>(`/trucks/${truckId}/eligibility`)
+  if (!data || data.eligible) return null
+  return (
+    <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+      <p className="font-semibold">{data.truck.label} cannot be dispatched</p>
+      <ul className="mt-1 list-disc pl-5">{data.reasons.map((r) => <li key={r}>{r}</li>)}</ul>
+      <Link to={`/compliance?truck=${truckId}`} className="mt-1 inline-block font-semibold underline">Open compliance documents</Link>
+    </div>
   )
 }
 

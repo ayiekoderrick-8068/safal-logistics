@@ -88,11 +88,27 @@ export const ROLE_LABELS: Record<string, string> = {
 
 export const DELAY_CAUSE_LABELS: Record<string, string> = {
   loading_congestion: 'Loading congestion',
+  vehicle_breakdown: 'Vehicle breakdown',
   documentation: 'Documentation issue',
+  equipment_breakdown: 'Equipment failure',
   truck_unavailability: 'Truck unavailability',
-  equipment_breakdown: 'Equipment breakdown',
   traffic: 'Traffic / road conditions',
   other: 'Other',
+}
+
+export const DOC_LABELS: Record<string, string> = {
+  insurance: 'Insurance',
+  licence: 'Vehicle licence',
+  inspection: 'Inspection certificate',
+  roadworthy: 'Roadworthiness',
+  speed_governor: 'Speed governor',
+  other: 'Other document',
+}
+
+export function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`
 }
 
 export function humanize(value: string): string {

@@ -72,22 +72,56 @@ test('truck registration through delivery records turnaround', async ({ page }) 
   }
   await expect(row).toContainText('Loaded')
 
-  // 4. Dispatch
+  // 4. Dispatch is blocked: the new truck has no mandatory compliance documents yet
   await row.getByRole('button', { name: 'Dispatch' }).click()
   await expect(page).toHaveURL(/dispatch\?schedule=/)
+  const dlg = page.getByRole('dialog')
+  await expect(dlg.getByText(`${REG} cannot be dispatched`)).toBeVisible()
+  await expect(dlg.getByText('Insurance is missing.')).toBeVisible()
+  await page.getByLabel('Route', { exact: true }).selectOption({ index: 1 })
+  await dlg.getByRole('button', { name: 'Dispatch truck' }).click()
+  await expect(dlg.getByText(`Dispatch blocked for ${REG}`, { exact: false })).toBeVisible() // server-side gate
+
+  // 5. Record the mandatory documents in Compliance Records (one with a supporting PDF)
+  await dlg.getByRole('link', { name: 'Open compliance documents' }).click()
+  await expect(page).toHaveURL(/compliance\?truck=/)
+  const docs = ['Insurance', 'Vehicle licence', 'Inspection certificate']
+  for (const [i, label] of docs.entries()) {
+    await page.getByRole('dialog').getByRole('row', { name: new RegExp(`^${label}`) })
+      .getByRole('button', { name: 'Add' }).click()
+    await page.getByLabel('Document reference').fill(`E2E-${i}`)
+    await page.getByLabel('Expiry date').fill('2030-01-01')
+    if (i === 0) {
+      await page.getByLabel('Supporting document (optional)').setInputFiles({
+        name: 'policy.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%%EOF\n'),
+      })
+    }
+    await page.getByRole('dialog').getByRole('button', { name: 'Save record' }).click()
+    await expect(page.getByRole('status').filter({ hasText: `${label} added` })).toBeVisible()
+  }
+  await expect(page.getByRole('dialog').getByText('Eligible for dispatch')).toBeVisible()
+  await expect(page.getByRole('dialog').getByRole('link', { name: 'Download policy.pdf' })).toBeVisible()
+  await page.getByRole('dialog').getByRole('button', { name: 'Close dialog' }).click()
+
+  // 6. Dispatch now succeeds
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Dispatch' }).click()
+  await page.getByRole('button', { name: 'New Dispatch' }).click()
+  const load = page.getByLabel('Loaded truck')
+  await load.selectOption(await load.locator('option', { hasText: REG }).getAttribute('value') ?? '')
   await page.getByLabel('Route', { exact: true }).selectOption({ index: 1 })
   await expect(page.getByRole('dialog').getByText('Turnaround', { exact: true })).toBeVisible() // live preview
+  await expect(page.getByRole('dialog').getByText('cannot be dispatched')).toHaveCount(0)
   await submitDialog(page, 'Dispatch truck')
   await expect(page.getByRole('status').filter({ hasText: `${REG} dispatched` })).toBeVisible()
 
-  // 5. Deliver
+  // 7. Deliver
   const dispatchRow = page.getByRole('row', { name: new RegExp(REG) })
   await expect(dispatchRow).toContainText('In Transit')
   await dispatchRow.getByRole('button', { name: 'Delivered' }).click()
   await expect(page.getByRole('dialog').getByText('On time.')).toBeVisible()
   await submitDialog(page, 'Confirm delivery')
 
-  // 6. Turnaround recorded; truck is free again
+  // 8. Turnaround recorded; truck is free again
   await expect(dispatchRow).toContainText('Delivered')
   await expect(dispatchRow.getByRole('cell').nth(6)).toHaveText(/^\d+ min$/)
 

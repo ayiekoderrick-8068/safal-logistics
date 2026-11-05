@@ -67,7 +67,79 @@ export interface Truck {
     status: 'valid' | 'expiring' | 'overdue' | 'missing'
     next_expiry: string | null
     next_expiry_type: string | null
+    eligible: boolean
+    issues: string[]
   }
+}
+
+// ---------- Compliance ----------
+export type DocType = 'insurance' | 'licence' | 'inspection' | 'roadworthy' | 'speed_governor' | 'other'
+export type DocState = 'valid' | 'expiring' | 'expired' | 'missing' | 'not_required'
+
+export interface ComplianceDocument {
+  id: number
+  truck: Ref
+  doc_type: DocType
+  reference_number: string
+  issuing_authority: string | null
+  issued_on: string
+  expires_on: string
+  days_remaining: number
+  state: 'valid' | 'expiring' | 'expired'
+  is_current: boolean
+  superseded_at: string | null
+  renewed_from_id: number | null
+  file: { name: string; content_type: string; size: number; uploaded_at: string } | null
+  notes: string | null
+  created_at: string
+}
+
+export interface VehicleCompliance {
+  truck: Ref
+  driver_name: string | null
+  truck_status: TruckStatus
+  status: 'compliant' | 'expiring' | 'non_compliant'
+  eligible: boolean
+  blockers: string[]
+  items: {
+    doc_type: DocType
+    mandatory: boolean
+    state: DocState
+    document_id: number | null
+    expires_on: string | null
+    days_remaining: number | null
+  }[]
+}
+
+export interface Requirement {
+  doc_type: DocType
+  label: string
+  is_mandatory: boolean
+  min_capacity_tonnes: number | null
+  reminder_days: number
+}
+
+export interface ComplianceOverview {
+  total_vehicles: number
+  compliant_vehicles: number
+  expiring_vehicles: number
+  non_compliant_vehicles: number
+  compliant_pct: number | null
+  expiring_documents: number
+  expired_documents: number
+  missing_documents: number
+  documents_on_record: number
+  documents_added_30d: number
+  inspections_due_30d: number
+  by_type: { doc_type: DocType; valid: number; expiring: number; expired: number; missing: number }[]
+  upcoming: { document_id: number; truck: Ref; doc_type: DocType; expires_on: string; days_remaining: number; state: string }[]
+  sample_data: boolean
+}
+
+export interface Eligibility {
+  truck: Ref
+  eligible: boolean
+  reasons: string[]
 }
 
 export interface TruckDetail extends Truck {

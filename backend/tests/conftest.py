@@ -5,6 +5,7 @@ rebuilt with the real Alembic migrations once per session and truncated between 
 """
 
 import os
+import tempfile
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
@@ -19,6 +20,10 @@ TEST_DB_URL = _base.test_database_url or make_url(_base.database_url).set(
     database=f"{make_url(_base.database_url).database}_test"
 ).render_as_string(hide_password=False)
 os.environ["LOGITRACK_DATABASE_URL"] = TEST_DB_URL
+os.environ.pop("LOGITRACK_DATABASE_NAME", None)
+# Uploaded files go to a throwaway directory, never the real upload store.
+os.environ["LOGITRACK_UPLOAD_DIR"] = tempfile.mkdtemp(prefix="logitrack-test-uploads-")
+os.environ["LOGITRACK_ALERT_REFRESH_SECONDS"] = "0"
 get_settings.cache_clear()
 
 from alembic.config import Config  # noqa: E402
@@ -30,6 +35,7 @@ from app.db import SessionLocal, get_engine  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.models import Role, User, UserStatus  # noqa: E402
 from app.security import hash_password  # noqa: E402
+from app.services.compliance import default_requirement_rows  # noqa: E402
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 TEST_PASSWORD = "Test-pass-123!"
@@ -67,6 +73,14 @@ def _clean_tables() -> Iterator[None]:
             .all()
         )
         conn.execute(text(f"TRUNCATE {', '.join(tables)} RESTART IDENTITY CASCADE"))
+        # Restore the migration-seeded reference data.
+        conn.execute(
+            text(
+                "INSERT INTO compliance_requirements (doc_type, is_mandatory, reminder_days) "
+                "VALUES (:doc_type, :is_mandatory, :reminder_days)"
+            ),
+            default_requirement_rows(),
+        )
 
 
 @pytest.fixture

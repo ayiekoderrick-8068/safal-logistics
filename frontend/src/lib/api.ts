@@ -29,10 +29,16 @@ function errorMessage(status: number, body: unknown): string {
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   let res: Response
   try {
+    // FormData (file uploads) must let the browser set the multipart boundary itself.
+    const isForm = typeof FormData !== 'undefined' && init.body instanceof FormData
     res = await fetch(`/api${path}`, {
       credentials: 'same-origin',
       ...init,
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...init.headers },
+      headers: {
+        Accept: 'application/json',
+        ...(isForm ? {} : { 'Content-Type': 'application/json' }),
+        ...init.headers,
+      },
     })
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') throw err

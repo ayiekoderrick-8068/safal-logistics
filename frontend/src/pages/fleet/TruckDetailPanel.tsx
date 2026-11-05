@@ -1,6 +1,6 @@
 import { CalendarClock, Gauge, Pencil, Route as RouteIcon, ShieldCheck, Timer, Truck, User, Warehouse } from 'lucide-react'
 import type { ReactNode } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { btnPrimary, btnSecondary } from '../../components/ui/buttons'
 import { Card } from '../../components/ui/Card'
 import { ErrorState, LoadingState } from '../../components/ui/States'
@@ -67,6 +67,15 @@ export function TruckDetailPanel({
           <StatusBadge status={t.compliance.status} label={complianceLabel} />
         </Row>
       </div>
+      {!t.compliance.eligible && (
+        <div role="note" className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+          <p className="font-semibold">Blocked from dispatch</p>
+          <ul className="mt-0.5 list-disc pl-4">{t.compliance.issues.map((i) => <li key={i}>{i}</li>)}</ul>
+        </div>
+      )}
+      <Link to={`/compliance?truck=${t.id}`} className="mt-3 text-sm font-semibold text-primary hover:underline">
+        View compliance documents →
+      </Link>
       {(canEdit || canSchedule) && (
         <div className="mt-4 grid gap-3">
           {canSchedule && (
