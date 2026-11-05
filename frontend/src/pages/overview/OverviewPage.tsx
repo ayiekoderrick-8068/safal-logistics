@@ -198,7 +198,7 @@ function OverviewContent({ data, stale }: { data: DashboardOverview; stale: bool
             <CardHeader
               title="Operational Alerts"
               subtitle="Compliance, maintenance, loading, delivery and delay alerts — most severe first."
-              action={<Link to="/alerts" className="rounded-lg border border-line px-3 py-1 text-sm font-semibold text-ink hover:bg-surface-muted">View all</Link>}
+              action={<Link to="/alerts" className="rounded-lg border border-line px-3 py-1 text-sm font-semibold whitespace-nowrap text-ink hover:bg-surface-muted">View all</Link>}
             />
             <AlertList limit={5} compact emptyTitle="No active alerts" />
           </Card>

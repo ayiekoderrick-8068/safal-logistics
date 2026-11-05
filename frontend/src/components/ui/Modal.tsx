@@ -11,12 +11,14 @@ export function Modal({
   onClose,
   children,
   wide = false,
+  extraWide = false,
 }: {
   title: string
   description?: string
   onClose: () => void
   children: ReactNode
   wide?: boolean
+  extraWide?: boolean
 }) {
   const panel = useRef<HTMLDivElement>(null)
   const close = useRef(onClose)
@@ -73,7 +75,7 @@ export function Modal({
         aria-describedby={description ? descId : undefined}
         className={clsx(
           'card max-h-[92vh] w-full overflow-y-auto rounded-b-none p-6 sm:rounded-2xl',
-          wide ? 'sm:max-w-2xl' : 'sm:max-w-lg',
+          extraWide ? 'sm:max-w-5xl' : wide ? 'sm:max-w-2xl' : 'sm:max-w-lg',
         )}
       >
         <div className="mb-5 flex items-start justify-between gap-4">

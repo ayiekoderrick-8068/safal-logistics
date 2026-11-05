@@ -4,8 +4,9 @@ LogiTrack is a logistics management platform for fleet, loading-bay scheduling, 
 turnaround-time analytics and vehicle compliance. It was built as a portfolio project inspired
 by the Graduate Logistics Systems Analyst role at Safal.
 
-> **Status: Milestone 1 of 6 complete.** See [Project status](#project-status) for exactly what
-> works today, what is sample data, and what is still to come.
+> **Status: Milestones 1–3 complete** (operations dashboard, the truck-to-delivery workflow,
+> compliance management, delay incidents, operational alerts, turnaround analytics). See
+> [Project status](#project-status) for exactly what works, what is sample data, and what remains.
 
 ## Tech stack
 
@@ -21,11 +22,13 @@ by the Graduate Logistics Systems Analyst role at Safal.
 ```
 frontend/  React SPA. Vite proxies /api -> backend so the session cookie is same-origin.
 backend/   FastAPI app
-  app/models.py        relational schema (10 domain tables + settings)
-  app/routers/         auth, system (health/meta), dashboard
-  app/services/        dashboard metrics, turnaround calculations, app settings
+  app/models.py        relational schema
+  app/routers/         auth, system, dashboard, fleet, loading, dispatch, compliance,
+                       incidents, alerts, analytics
+  app/services/        dashboard metrics, turnaround, operations workflow, compliance
+                       rules, alert engine, file storage, app settings
   app/sample_data.py   clearly-labelled demonstration dataset
-  app/cli.py           create-admin / load-sample / clear-sample
+  app/cli.py           create-admin / load-sample / clear-sample / refresh-alerts / reset-e2e
   alembic/             migrations (the source of truth for the schema)
 docker-compose.yml     local PostgreSQL (dev + test databases)
 ```
@@ -33,7 +36,14 @@ docker-compose.yml     local PostgreSQL (dev + test databases)
 ### Data model
 
 `users`, `drivers`, `trucks`, `routes`, `loading_bays`, `loading_schedules`, `dispatches`,
-`delay_incidents`, `compliance_documents`, `audit_events`, `app_settings`.
+`delay_incidents`, `compliance_documents`, `compliance_requirements`, `alerts`,
+`audit_events`, `app_settings`.
+
+Migrations: `c9ec15ec26f6` (initial schema) and `4cdcd62eb0a9` (compliance history, file
+metadata and requirements; delay assignment and resolution; alerts). The second migration
+keeps existing records: it marks older duplicate documents as history and fixes incident
+status and resolution times before adding the new constraints. It has been verified with a
+downgrade → upgrade round trip.
 
 Business rules are enforced **in the database** as well as in the API:
 
@@ -45,6 +55,11 @@ Business rules are enforced **in the database** as well as in the API:
   and load references. At most one truck per driver.
 - **Complete deliveries.** A delivered dispatch must have an actual arrival time.
 - **Traceable delays.** Each delay incident must be linked to a dispatch or a loading schedule.
+  A resolved incident must have a resolution time, and it can't be earlier than the start.
+- **One current document per truck and type.** Renewals add a new row, so the history is
+  never overwritten.
+- **One unresolved alert per condition.** A partial unique index on the alert key prevents
+  duplicates.
 
 ### Metric definitions
 
@@ -53,7 +68,9 @@ Business rules are enforced **in the database** as well as in the API:
 | Turnaround time | `departed_at − arrival_at` of a loading schedule (truck arrival → departure) |
 | Within target | Turnaround ≤ the bay's target, or the global target (default 120 min) |
 | Loads processed | Loading schedules that departed in the period (excluding cancelled ones) |
-| On-time delivery | Delivered dispatches arriving in the period with actual arrival ≤ expected arrival |
+| On-time delivery | Delivered dispatches arriving in the period with actual arrival ≤ expected arrival + grace (default 15 min) |
+| Delay duration | `resolved_at − occurred_at` (or now − start while still open), from stored timestamps |
+| Document status | expired if past its expiry date; expiring if within the type's reminder window (default 30 days); otherwise valid; missing if mandatory and absent |
 | Bay utilisation | Occupied bay time ÷ (active bays × days × operating hours per day, default 12) |
 
 Every figure is calculated by SQL over recorded rows. When there is no data, the UI shows
@@ -148,9 +165,106 @@ Every step is written to the audit log with the acting user. Role permissions:
 |--------|-------|
 | Register and edit drivers and trucks | Fleet Manager, Administrator |
 | Bays, routes, schedules, loading times, dispatch, delivery | Operations, Administrator |
-| View everything | All signed-in roles |
+| Add, renew and upload compliance documents | Compliance, Fleet Manager, Administrator |
+| Change mandatory-document requirements | Compliance, Administrator |
+| Report, assign, update and resolve delays; acknowledge and resolve alerts | Operations, Fleet Manager, Compliance, Administrator |
+| View everything, including documents | All signed-in roles (Viewer is read-only) |
+
+Every write is checked on the server; the UI only hides buttons as a convenience.
+
+## Compliance, delays and alerts (Milestone 3)
+
+### Compliance records
+
+- **Documents.** Insurance, vehicle licence, inspection certificate, roadworthiness, speed
+  governor and other. Each has a reference, issuing authority, issue and expiry dates, notes
+  and an optional supporting file.
+- **Renewal.** Renewing a document creates a new current record and keeps the old one as
+  history (`renewed_from_id`, `superseded_at`). A renewal must expire later than the current
+  document.
+- **Configurable requirements.** For each document type you can set whether it's mandatory,
+  the minimum truck capacity it applies to, and a reminder window. Defaults: insurance,
+  vehicle licence and inspection are mandatory, with a 30-day reminder.
+- **Dispatch enforcement.**
+  - Rules checked when a dispatch is created, on the server: a truck under maintenance or out
+    of service, or one with a missing or expired mandatory document, is blocked. The 409
+    response lists every reason.
+  - Concurrency: the check runs in the same transaction as the dispatch, with a row lock on
+    the truck.
+  - Audit: blocked attempts are audited.
+  - Restoring eligibility: an authorised renewal makes the truck eligible again.
+- **File storage.**
+  - Accepted files: PDF, PNG and JPEG up to 10 MB. The type is detected from the file's
+    content, not the name or the type the browser reports.
+  - Storage: files sit under `backend/var/uploads/` (gitignored, set by
+    `LOGITRACK_UPLOAD_DIR`) using random 128-bit keys, and the SHA-256 is recorded.
+  - Downloads: served only through the authenticated API, as attachments with `nosniff`.
+
+### Delay incidents
+
+- **Reporting.** Report a delay against a loading schedule or a dispatch. Categories: loading
+  congestion, vehicle breakdown, documentation issue, equipment failure, truck unavailability,
+  traffic, other. Each records a start time, impact minutes, a description and a responsible
+  staff member.
+- **Workflow.** Status moves open → investigating → in progress → resolved. Resolving
+  requires resolution notes and a resolution time; reopening clears that time.
+- **Duration** is always `resolved_at − occurred_at`, calculated from stored timestamps.
+  Late-delivery incidents start at the missed ETA.
+
+### Operational alerts
+
+- **Types.** Missing, expired and expiring documents; upcoming inspections; vehicles in
+  maintenance; loading over target; missed dispatch times; overdue deliveries; unresolved
+  delays (over 4 h).
+- **Severity.** Info, warning or critical. If an acknowledged alert gets more severe, it
+  re-opens.
+- **Deduplication.** Each condition has a stable key, and the database allows only one
+  unresolved alert per key.
+- **Resolution.** Alerts resolve automatically when the condition clears. Resolving one
+  manually needs a note and stops it re-appearing for 24 h. History is kept.
+- **Evaluation.** Alerts are re-checked when read, at most every 60 s
+  (`LOGITRACK_ALERT_REFRESH_SECONDS`). For a scheduled job, run
+  `uv run python -m app.cli refresh-alerts`. No SMS or email is sent.
+- **Where they appear.** The top-bar bell, the Alerts page, and the Overview, Fleet, Loading
+  Bays and Dispatch pages. Each alert links to the affected truck, booking or dispatch.
+
+### API endpoints (Milestone 3)
+
+| Method & path | Purpose |
+|---------------|---------|
+| `GET /api/compliance/overview` | KPIs, status by document type, upcoming renewals |
+| `GET /api/compliance/vehicles` | Per-vehicle compliance (`q`, `status`, `doc_type`, paging) |
+| `GET /api/trucks/{id}/compliance` · `/eligibility` · `/documents` | Vehicle view, dispatch eligibility, documents including history |
+| `POST /api/compliance/documents` · `POST …/{id}/renew` | Create a document; renew (keeps history) |
+| `PUT` / `GET /api/compliance/documents/{id}/file` | Upload / download the supporting file |
+| `GET` / `PUT /api/compliance/requirements[/{type}]` | Read / configure mandatory documents |
+| `GET` / `POST /api/incidents`, `PATCH /api/incidents/{id}` | List (filters) / report / update and resolve delays |
+| `GET /api/incidents/summary`, `GET /api/users/assignable` | Delay KPIs; staff available for assignment |
+| `GET /api/alerts`, `GET /api/alerts/summary` | Alerts (`status`, `severity`, `types`, `truck_id`); bell summary |
+| `POST /api/alerts/{id}/acknowledge` · `/resolve` · `POST /api/alerts/refresh` | Alert actions |
+| `GET /api/analytics/turnaround` | Turnaround KPIs, trend, per-bay performance, delay causes |
+
+Full interactive documentation: http://localhost:8090/docs.
 
 ## Project status
+
+### Working (Milestone 3)
+
+- **Compliance Records page** (approved design): KPIs, expiry overview by type, fleet status
+  donut, upcoming renewals, and a vehicle table with filters. The per-vehicle documents view
+  covers eligibility, add, renew, upload, download and history, alongside a requirements
+  editor.
+- **Dispatch enforcement**, shown in the Fleet truck panel and the New Dispatch form, and
+  enforced by the server.
+- **Delay Reports page:** KPIs, cause breakdown, unresolved list, filterable incident table,
+  and the report and update dialogs. A "Delay" action is available on loading schedules.
+- **Operational alerts:** bell with badge, Alerts page, and alert cards on Overview, Fleet,
+  Loading Bays and Dispatch.
+- **Turnaround-Time Analytics page** (approved design): KPIs, trend against target, delay
+  causes, turnaround by bay, and recent incidents.
+- **Tests:** 89 backend, 29 frontend unit/component, and 12 end-to-end (8 desktop and 4
+  mobile). The end-to-end tests cover a dispatch blocked for missing documents and then
+  allowed, a delay reported and resolved, and an alert acknowledged and resolved.
 
 ### Working (Milestone 2)
 
@@ -204,15 +318,17 @@ Every step is written to the audit log with the acting user. Role permissions:
 
 ### Not built yet (pages exist and say so; they show no figures)
 
-| Milestone | Scope |
-|-----------|-------|
-| 3 | Turnaround analytics and delay reports pages |
-| 4 | Compliance records management and expiry alerts workflow |
-| 5 | User management UI, activity log viewer, settings (targets, policies) |
-| 6 | Reports: filtering, CSV export, PDF reports |
+| Next | Scope |
+|------|-------|
+| 4 | Reports: filtering, CSV export, PDF reports |
+| 5 | User management UI, activity log viewer, settings (targets, grace period, policies) |
 
 Also outstanding:
-- Login rate limiting, notifications, and global record search.
+- Login rate limiting and global record search.
+- Editing or correcting a document's reference without renewing it (documents are
+  deliberately immutable for now).
+- Antivirus scanning and object storage for uploaded files.
+- A background scheduler for alerts. Alerts are currently refreshed when read or by the CLI.
 - Fleet export (it belongs with Reports).
 - Editing or deleting bays and routes (they can only be created for now).
 - Truck photos, mileage and service-date fields shown in the design. They need new fields

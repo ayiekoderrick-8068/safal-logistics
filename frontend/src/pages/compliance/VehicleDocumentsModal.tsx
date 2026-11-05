@@ -77,7 +77,7 @@ export function VehicleDocumentsModal({
 
   const s = summary.data
   return (
-    <Modal title={s ? `${s.truck.label} — compliance documents` : 'Compliance documents'} wide onClose={onClose}
+    <Modal title={s ? `${s.truck.label} — compliance documents` : 'Compliance documents'} extraWide onClose={onClose}
       description={s?.driver_name ? `Driver: ${s.driver_name}` : undefined}>
       {!s || !docs.data ? (
         summary.error || docs.error ? <FormError message={(summary.error ?? docs.error)!.message} /> : <LoadingState />
