@@ -179,6 +179,28 @@ export interface AssignableUser {
   role: Role
 }
 
+export interface TurnaroundAnalytics {
+  period_start: string
+  period_end: string
+  previous_period_start: string
+  previous_period_end: string
+  target_minutes: number
+  kpis: DashboardOverview['kpis']
+  trend: DashboardOverview['trend']
+  bays: {
+    bay: Bay
+    loads: number
+    avg_turnaround_minutes: number | null
+    avg_loading_minutes: number | null
+    within_target_pct: number | null
+    utilization_pct: number | null
+    status: 'within' | 'above' | 'no_data'
+  }[]
+  causes: { cause: DelayCause; count: number; impact_minutes: number }[]
+  recent_incidents: Incident[]
+  sample_data: boolean
+}
+
 // ---------- Alerts ----------
 export type AlertSeverity = 'info' | 'warning' | 'critical'
 

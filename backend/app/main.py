@@ -5,6 +5,7 @@ from . import __version__
 from .config import get_settings
 from .routers import (
     alerts,
+    analytics,
     auth,
     compliance,
     dashboard,
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
     app.include_router(compliance.router)
     app.include_router(incidents.router)
     app.include_router(alerts.router)
+    app.include_router(analytics.router)
     return app
 
 

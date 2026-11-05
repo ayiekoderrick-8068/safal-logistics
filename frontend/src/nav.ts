@@ -89,14 +89,6 @@ export const NAV: NavSection[] = [
       {
         to: '/turnaround', label: 'Turnaround Analytics', title: 'Turnaround-Time Analytics', icon: BarChart3,
         description: 'Measure loading turnaround and identify delay causes.',
-        planned: {
-          milestone: 'Milestone 3',
-          features: [
-            'Turnaround trend vs configurable target',
-            'Turnaround and utilisation by loading bay',
-            'Recurring delay-cause breakdown',
-          ],
-        },
       },
       {
         to: '/delays', label: 'Delay Reports', title: 'Delay Reports', icon: Timer,
