@@ -22,9 +22,10 @@ On time: delivered with actual_arrival_at <= deadline, where deadline = expected
 LOGITRACK_DELAY_GRACE_MINUTES (default 15).
 
 Entity filters apply everywhere through the same relationships:
-  truck -> the operation's truck; driver -> the truck's *currently assigned* driver
-  (assignment history is not recorded); bay -> the loading booking's bay; route -> the
-  dispatch route; dispatch status -> the dispatch (``delayed`` = flagged delayed);
+  truck -> the operation's truck; driver -> the driver assigned to that truck *at the time
+  of the operation* (driver_assignments history: arrival/scheduled start for loads,
+  dispatched_at for dispatches, occurred_at for incidents); bay -> the loading booking's
+  bay; route -> the dispatch route; dispatch status -> the dispatch (``delayed`` = flagged delayed);
   delay category -> operations with at least one incident of that category.
 """
 
@@ -45,6 +46,7 @@ from ..models import (
     Dispatch,
     DispatchStatus,
     Driver,
+    DriverAssignment,
     IncidentStatus,
     LoadingBay,
     LoadingSchedule,
@@ -206,16 +208,43 @@ def _dispatch_status_clause(f: ReportFilters, d):
     return d.status == DispatchStatus(f.dispatch_status)
 
 
+def _assignment_at(truck_col, at_col):
+    """Alias + join condition for the driver assigned to `truck_col` at moment `at_col`.
+
+    Assignment periods never overlap (exclusion constraint), so this matches at most one row.
+    """
+    da = aliased(DriverAssignment)
+    cond = and_(
+        da.truck_id == truck_col,
+        da.assigned_at <= at_col,
+        or_(da.released_at.is_(None), da.released_at > at_col),
+    )
+    return da, cond
+
+
+def _driver_was_assigned(driver_id: int, truck_col, at_col):
+    """True when `driver_id` was assigned to the truck at the time of the operation."""
+    return exists().where(
+        DriverAssignment.driver_id == driver_id,
+        DriverAssignment.truck_id == truck_col,
+        DriverAssignment.assigned_at <= at_col,
+        or_(DriverAssignment.released_at.is_(None), DriverAssignment.released_at > at_col),
+    )
+
+
 def load_query(f: ReportFilters, anchor: Literal["departed", "scheduled", "occupancy"]) -> Select:
     """One row per loading booking (with its dispatch, if any), filtered consistently."""
     s, e = f.bounds()
     S, D = LoadingSchedule, DispatchAlias
+    op_time = func.coalesce(S.arrival_at, S.scheduled_start)
+    DA, da_cond = _assignment_at(S.truck_id, op_time)
+    Dr = aliased(Driver)
     q = (
         select(
             S.id.label("schedule_id"),
             S.truck_id,
             Truck.registration,
-            Driver.full_name.label("driver"),
+            Dr.full_name.label("driver"),
             S.bay_id,
             LoadingBay.name.label("bay"),
             LoadingBay.target_turnaround_minutes.label("bay_target"),
@@ -238,7 +267,8 @@ def load_query(f: ReportFilters, anchor: Literal["departed", "scheduled", "occup
             D.actual_arrival_at,
         )
         .join(Truck, Truck.id == S.truck_id)
-        .outerjoin(Driver, Driver.id == Truck.driver_id)
+        .outerjoin(DA, da_cond)
+        .outerjoin(Dr, Dr.id == DA.driver_id)
         .join(LoadingBay, LoadingBay.id == S.bay_id)
         .outerjoin(D, D.schedule_id == S.id)
         .outerjoin(Route, Route.id == D.route_id)
@@ -257,7 +287,7 @@ def load_query(f: ReportFilters, anchor: Literal["departed", "scheduled", "occup
     if f.truck_id:
         q = q.where(S.truck_id == f.truck_id)
     if f.driver_id:
-        q = q.where(Truck.driver_id == f.driver_id)
+        q = q.where(_driver_was_assigned(f.driver_id, S.truck_id, op_time))
     if f.bay_id:
         q = q.where(S.bay_id == f.bay_id)
     if f.route_id:
@@ -273,13 +303,15 @@ def dispatch_query(f: ReportFilters) -> Select:
     """One row per dispatch dispatched in the period."""
     s, e = f.bounds()
     D = Dispatch
+    DA, da_cond = _assignment_at(D.truck_id, D.dispatched_at)
+    Dr = aliased(Driver)
     q = (
         select(
             D.id.label("dispatch_id"),
             D.load_ref,
             D.truck_id,
             Truck.registration,
-            Driver.full_name.label("driver"),
+            Dr.full_name.label("driver"),
             D.route_id,
             Route.origin,
             Route.destination,
@@ -294,7 +326,8 @@ def dispatch_query(f: ReportFilters) -> Select:
             LoadingBay.name.label("bay"),
         )
         .join(Truck, Truck.id == D.truck_id)
-        .outerjoin(Driver, Driver.id == Truck.driver_id)
+        .outerjoin(DA, da_cond)
+        .outerjoin(Dr, Dr.id == DA.driver_id)
         .join(Route, Route.id == D.route_id)
         .outerjoin(LoadingSchedule, LoadingSchedule.id == D.schedule_id)
         .outerjoin(LoadingBay, LoadingBay.id == LoadingSchedule.bay_id)
@@ -303,7 +336,7 @@ def dispatch_query(f: ReportFilters) -> Select:
     if f.truck_id:
         q = q.where(D.truck_id == f.truck_id)
     if f.driver_id:
-        q = q.where(Truck.driver_id == f.driver_id)
+        q = q.where(_driver_was_assigned(f.driver_id, D.truck_id, D.dispatched_at))
     if f.bay_id:
         q = q.where(LoadingSchedule.bay_id == f.bay_id)
     if f.route_id:
@@ -360,7 +393,7 @@ def incident_query(f: ReportFilters) -> Select:
     if f.truck_id:
         q = q.where(truck_id == f.truck_id)
     if f.driver_id:
-        q = q.where(T.driver_id == f.driver_id)
+        q = q.where(_driver_was_assigned(f.driver_id, truck_id, I.occurred_at))
     if f.bay_id:
         q = q.where(bay_id == f.bay_id)
     if f.route_id:
@@ -496,7 +529,7 @@ def compliance_interruptions(ctx: Context) -> int:
     if ctx.f.truck_id:
         q = q.where(LoadingSchedule.truck_id == ctx.f.truck_id)
     if ctx.f.driver_id:
-        q = q.where(Truck.driver_id == ctx.f.driver_id)
+        q = q.where(_driver_was_assigned(ctx.f.driver_id, Truck.id, AuditEvent.created_at))
     if ctx.f.bay_id:
         q = q.where(LoadingSchedule.bay_id == ctx.f.bay_id)
     return ctx.db.scalar(q) or 0

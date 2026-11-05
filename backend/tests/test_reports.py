@@ -32,6 +32,7 @@ from app.models import (
     Dispatch,
     DispatchStatus,
     Driver,
+    DriverAssignment,
     IncidentStatus,
     LoadingBay,
     LoadingSchedule,
@@ -154,7 +155,14 @@ def ids(db: Session) -> dict[str, int]:
         delay_minutes=15,
         occurred_at=at(14, 45),
     )
+    since = at(0, 0, DAY - timedelta(days=30))
     db.add_all([b3, r1, r2, l1, l2, l3, l4, l5, d1_, d2_, d3_, i1, i2, i3])
+    db.add_all(
+        [
+            DriverAssignment(driver=d1, truck=t1, assigned_at=since, source="manual"),
+            DriverAssignment(driver=d2, truck=t2, assigned_at=since, source="manual"),
+        ]
+    )
     db.flush()
     db.add(
         AuditEvent(

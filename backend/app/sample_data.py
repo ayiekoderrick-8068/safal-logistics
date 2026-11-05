@@ -25,6 +25,7 @@ from .models import (
     DispatchStatus,
     DocumentType,
     Driver,
+    DriverAssignment,
     IncidentStatus,
     LoadingBay,
     LoadingSchedule,
@@ -97,6 +98,7 @@ def clear_sample_data(db: Session) -> None:
     )
     for model in (
         Alert,
+        DriverAssignment,
         DelayIncident,
         Dispatch,
         LoadingSchedule,
@@ -149,6 +151,13 @@ def load_sample_data(db: Session, today: date | None = None, seed: int = 2026) -
         for i, (reg, make, model, cap) in enumerate(TRUCKS)
     ]
     db.add_all(trucks)
+    # Assignment history starts at the beginning of the sample period.
+    period_start = datetime.combine(today - timedelta(days=DAYS), time.min, tzinfo=tz)
+    db.add_all(
+        DriverAssignment(driver=t.driver, truck=t, assigned_at=period_start, source="sample")
+        for t in trucks
+        if t.driver is not None
+    )
     routes = [
         Route(origin=o, destination=d, distance_km=Decimal(km), expected_duration_minutes=m)
         for o, d, km, m in ROUTES

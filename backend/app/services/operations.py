@@ -49,6 +49,8 @@ CONSTRAINT_MESSAGES = {
     "uq_routes_origin_destination": "That route already exists.",
     "uq_loading_bays_code": "A bay with that code already exists.",
     "uq_dispatches_schedule_id": "This load has already been dispatched.",
+    "ex_driver_assignments_truck_overlap": "That truck already has a driver for that period.",
+    "ex_driver_assignments_driver_overlap": "That driver is already assigned to another truck.",
 }
 
 

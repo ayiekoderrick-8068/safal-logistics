@@ -86,7 +86,7 @@ def write_csv(
 LOAD_COLUMNS: list[Column] = [
     _col("Booking ID", "schedule_id"),
     _col("Truck", "truck"),
-    _col("Driver (current)", "driver"),
+    _col("Driver (at the time)", "driver"),
     _col("Loading bay", "bay"),
     _col("Route", "route"),
     _col("Load ref", "load_ref"),
@@ -111,7 +111,7 @@ LOAD_COLUMNS: list[Column] = [
 DISPATCH_COLUMNS: list[Column] = [
     _col("Load ref", "load_ref"),
     _col("Truck", "truck"),
-    _col("Driver (current)", "driver"),
+    _col("Driver (at the time)", "driver"),
     _col("Route", "route"),
     _col("Loading bay", "bay"),
     _col("Dispatched", "dispatched_at"),

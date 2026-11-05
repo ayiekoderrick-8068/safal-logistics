@@ -12,6 +12,7 @@ from ..deps import get_current_user, require_roles
 from ..models import (
     ComplianceDocument,
     Driver,
+    DriverAssignment,
     LoadingSchedule,
     Role,
     ScheduleStatus,
@@ -20,16 +21,19 @@ from ..models import (
     User,
 )
 from ..schemas_ops import (
+    AssignmentOut,
     DriverIn,
     DriverOut,
     FleetSummary,
     Page,
+    Ref,
     TruckDetail,
     TruckDocument,
     TruckIn,
     TruckOut,
     TruckUpdate,
 )
+from ..services.assignments import set_driver
 from ..services.operations import (
     commit,
     compliance_by_truck,
@@ -43,6 +47,10 @@ from ..services.operations import (
 from ..services.turnaround import turnaround_minutes
 
 router = APIRouter(prefix="/api", tags=["fleet"])
+# Assignment history: operational staff (viewers do not see personnel history).
+HistoryReader = Annotated[
+    User, Depends(require_roles(Role.OPERATIONS, Role.FLEET_MANAGER, Role.COMPLIANCE))
+]
 FleetWriter = Annotated[User, Depends(require_roles(Role.FLEET_MANAGER))]
 Reader = Annotated[User, Depends(get_current_user)]
 DB = Annotated[Session, Depends(get_db)]
@@ -206,9 +214,9 @@ def create_truck(body: TruckIn, request: Request, db: DB, user: FleetWriter) -> 
         capacity_tonnes=body.capacity_tonnes,
         status=TruckStatus.AVAILABLE,
     )
-    if body.driver_id is not None:
-        truck.driver = _assignable_driver(db, body.driver_id)
     db.add(truck)
+    if body.driver_id is not None:
+        set_driver(db, truck, _assignable_driver(db, body.driver_id), user)
     db.flush()
     record_event(
         db,
@@ -239,9 +247,8 @@ def update_truck(
 
     if "driver_id" in fields:
         new_driver = _assignable_driver(db, body.driver_id, truck) if body.driver_id else None
-        if new_driver is not truck.driver:
+        if set_driver(db, truck, new_driver, user, note=body.assignment_note):
             changes["driver"] = new_driver.full_name if new_driver else None
-            truck.driver = new_driver
 
     if body.status is not None and body.status != truck.status:
         if truck.status in (TruckStatus.LOADING, TruckStatus.IN_TRANSIT):
@@ -263,5 +270,53 @@ def update_truck(
             summary=f"Truck {truck.registration} updated",
             changes=changes,
         )
-        commit(db)
+        commit(db, "That driver already has an assignment in that period.")
     return trucks_out(db, [truck])[0]
+
+
+# ---------- driver assignment history ----------
+_ASSIGNMENT_OPTIONS = (
+    joinedload(DriverAssignment.driver),
+    joinedload(DriverAssignment.truck),
+    joinedload(DriverAssignment.assigned_by),
+    joinedload(DriverAssignment.released_by),
+)
+
+
+def _assignment_out(a: DriverAssignment) -> AssignmentOut:
+    return AssignmentOut(
+        id=a.id,
+        driver=Ref(id=a.driver.id, label=a.driver.full_name),
+        truck=Ref(id=a.truck.id, label=a.truck.registration),
+        assigned_at=a.assigned_at,
+        released_at=a.released_at,
+        is_current=a.released_at is None,
+        assigned_by=a.assigned_by.full_name if a.assigned_by else None,
+        released_by=a.released_by.full_name if a.released_by else None,
+        note=a.note,
+        source=a.source,
+    )
+
+
+def _history(db: Session, column, ident: int) -> list[AssignmentOut]:
+    rows = db.scalars(
+        select(DriverAssignment)
+        .options(*_ASSIGNMENT_OPTIONS)
+        .where(column == ident)
+        .order_by(DriverAssignment.assigned_at.desc())
+    ).unique()
+    return [_assignment_out(a) for a in rows]
+
+
+@router.get("/trucks/{truck_id}/assignments", response_model=list[AssignmentOut])
+def truck_assignments(truck_id: int, db: DB, _: HistoryReader) -> list[AssignmentOut]:
+    if db.get(Truck, truck_id) is None:
+        raise not_found("Truck")
+    return _history(db, DriverAssignment.truck_id, truck_id)
+
+
+@router.get("/drivers/{driver_id}/assignments", response_model=list[AssignmentOut])
+def driver_assignments(driver_id: int, db: DB, _: HistoryReader) -> list[AssignmentOut]:
+    if db.get(Driver, driver_id) is None:
+        raise not_found("Driver")
+    return _history(db, DriverAssignment.driver_id, driver_id)

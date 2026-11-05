@@ -1,7 +1,9 @@
 import { CalendarClock, Gauge, Pencil, Route as RouteIcon, ShieldCheck, Timer, Truck, User, Warehouse } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { useAuth } from '../../auth/context'
 import { btnPrimary, btnSecondary } from '../../components/ui/buttons'
+import { DriverHistory } from './DriverHistory'
 import { AlertList } from '../../components/alerts/AlertList'
 import { Card } from '../../components/ui/Card'
 import { ErrorState, LoadingState } from '../../components/ui/States'
@@ -35,6 +37,7 @@ export function TruckDetailPanel({
 }) {
   const { data, error, loading, refetch } = useApi<TruckDetail>(`/trucks/${truckId}?v=${version}`)
   const navigate = useNavigate()
+  const canViewHistory = useAuth().hasRole('operations', 'fleet_manager', 'compliance')
 
   if (error && !data) return <Card><ErrorState message={error.message} onRetry={refetch} /></Card>
   if (!data || (loading && data.id !== truckId)) return <Card><LoadingState /></Card>
@@ -74,6 +77,7 @@ export function TruckDetailPanel({
           <ul className="mt-0.5 list-disc pl-4">{t.compliance.issues.map((i) => <li key={i}>{i}</li>)}</ul>
         </div>
       )}
+      {canViewHistory && <DriverHistory truckId={t.id} version={version} />}
       <div className="mt-3">
         <p className="mb-2 text-sm font-semibold text-ink">Active alerts</p>
         <AlertList query={`truck_id=${t.id}`} limit={3} compact emptyTitle="No alerts for this truck" version={version} />

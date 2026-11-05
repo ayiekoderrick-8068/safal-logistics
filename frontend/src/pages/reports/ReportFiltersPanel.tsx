@@ -80,7 +80,7 @@ export function ReportFiltersPanel({ applied, onApply }: {
             <option value="">All trucks</option>
             {trucks.data?.items.map((t) => <option key={t.id} value={t.id}>{t.registration}</option>)}
           </Select>
-          <Select id="f-driver" label="Driver (current)" value={draft.driver_id} onChange={(v) => set({ driver_id: v })}>
+          <Select id="f-driver" label="Driver" value={draft.driver_id} onChange={(v) => set({ driver_id: v })}>
             <option value="">All drivers</option>
             {drivers.data?.map((d) => <option key={d.id} value={d.id}>{d.full_name}</option>)}
           </Select>

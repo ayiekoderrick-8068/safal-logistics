@@ -104,6 +104,7 @@ class TruckUpdate(BaseModel):
     model: str | None = Field(default=None, max_length=60)
     capacity_tonnes: Decimal | None = Field(default=None, gt=0, le=100, decimal_places=2)
     driver_id: int | None = None
+    assignment_note: str | None = Field(default=None, max_length=255)
     status: Literal["available", "maintenance", "out_of_service"] | None = None
 
 
@@ -139,6 +140,19 @@ class TruckDetail(TruckOut):
     documents: list[TruckDocument]
     loads_completed_30d: int
     avg_turnaround_30d: float | None
+
+
+class AssignmentOut(BaseModel):
+    id: int
+    driver: Ref
+    truck: Ref
+    assigned_at: datetime
+    released_at: datetime | None
+    is_current: bool
+    assigned_by: str | None
+    released_by: str | None
+    note: str | None
+    source: str
 
 
 class FleetSummary(BaseModel):

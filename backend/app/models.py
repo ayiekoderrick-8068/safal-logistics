@@ -198,6 +198,40 @@ class Truck(TimestampMixin, Base):
     driver: Mapped[Driver | None] = relationship(back_populates="truck")
 
 
+class DriverAssignment(Base):
+    """History of which driver was assigned to which truck, and when.
+
+    Exclusion constraints (created in the migration) forbid overlapping periods for the same
+    truck or the same driver, so at most one assignment is active per truck and per driver,
+    and "who drove truck X at time T" always has a single answer. trucks.driver_id remains
+    the denormalised *current* assignment and is kept in sync by services.assignments.
+    """
+
+    __tablename__ = "driver_assignments"
+    __table_args__ = (
+        CheckConstraint(
+            "released_at IS NULL OR released_at >= assigned_at", name="released_after_assigned"
+        ),
+        CheckConstraint("source IN ('manual', 'backfill', 'sample')", name="source_valid"),
+        Index("ix_driver_assignments_truck_period", "truck_id", "assigned_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    driver_id: Mapped[int] = mapped_column(ForeignKey("drivers.id", ondelete="CASCADE"), index=True)
+    truck_id: Mapped[int] = mapped_column(ForeignKey("trucks.id", ondelete="CASCADE"))
+    assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    assigned_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    released_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    note: Mapped[str | None] = mapped_column(String(255))
+    source: Mapped[str] = mapped_column(String(10), default="manual", server_default="manual")
+
+    driver: Mapped[Driver] = relationship()
+    truck: Mapped[Truck] = relationship()
+    assigned_by: Mapped[User | None] = relationship(foreign_keys=[assigned_by_id])
+    released_by: Mapped[User | None] = relationship(foreign_keys=[released_by_id])
+
+
 class Route(TimestampMixin, Base):
     __tablename__ = "routes"
     __table_args__ = (

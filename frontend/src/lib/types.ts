@@ -244,6 +244,19 @@ export interface TruckDetail extends Truck {
   avg_turnaround_30d: number | null
 }
 
+export interface DriverAssignment {
+  id: number
+  driver: Ref
+  truck: Ref
+  assigned_at: string
+  released_at: string | null
+  is_current: boolean
+  assigned_by: string | null
+  released_by: string | null
+  note: string | null
+  source: 'manual' | 'backfill' | 'sample'
+}
+
 export interface FleetSummary {
   total: number
   available: number
