@@ -6,6 +6,8 @@ export type AuthStatus = 'loading' | 'authenticated' | 'anonymous'
 export interface AuthContextValue {
   status: AuthStatus
   user: User | null
+  /** True when a signed-in session was rejected by the server (expired or revoked). */
+  sessionExpired: boolean
   login: (username: string, password: string) => Promise<User>
   logout: () => Promise<void>
   hasRole: (...roles: Role[]) => boolean

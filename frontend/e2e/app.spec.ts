@@ -23,7 +23,21 @@ test('wrong password shows an error', async ({ page }) => {
   await page.getByLabel('Username or email').fill(USERNAME!)
   await page.getByLabel('Password', { exact: true }).fill('definitely-wrong-1!')
   await page.getByRole('button', { name: 'Sign in' }).click()
-  await expect(page.getByRole('alert')).toHaveText('Invalid username or password')
+  await expect(page.getByRole('alert')).toHaveText('The username or password is incorrect.')
+})
+
+test('repeated failures pause sign-in with a countdown (server-side rate limit)', async ({ page }, info) => {
+  const probe = `lockout-probe-${info.project.name}`
+  await page.goto('/login')
+  for (let i = 0; i < 5; i++) {
+    await page.getByLabel('Username or email').fill(probe)
+    await page.getByLabel('Password', { exact: true }).fill(`wrong-${i}`)
+    await page.getByRole('button', { name: 'Sign in' }).click()
+    await expect(page.getByRole('alert')).toBeVisible()
+  }
+  await expect(page.getByRole('alert')).toContainText('Too many sign-in attempts')
+  await expect(page.getByTestId('lockout-countdown')).toHaveText(/^1[45]:\d{2}$/)
+  await expect(page.getByRole('button', { name: 'Sign-in paused' })).toBeDisabled()
 })
 
 test('overview loads KPIs from the API', async ({ page }) => {

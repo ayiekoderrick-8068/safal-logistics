@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api, ApiError, setUnauthorizedHandler } from '../lib/api'
 import type { Role, User } from '../lib/types'
 import { AuthContext, type AuthStatus } from './context'
@@ -6,6 +6,11 @@ import { AuthContext, type AuthStatus } from './context'
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [status, setStatus] = useState<AuthStatus>('loading')
+  const [sessionExpired, setSessionExpired] = useState(false)
+  const statusRef = useRef<AuthStatus>('loading')
+  useEffect(() => {
+    statusRef.current = status
+  }, [status])
 
   useEffect(() => {
     let cancelled = false
@@ -27,7 +32,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
+    // Any API call answered with 401 while signed in means the session expired or was revoked.
     setUnauthorizedHandler(() => {
+      if (statusRef.current === 'authenticated') setSessionExpired(true)
       setUser(null)
       setStatus('anonymous')
     })
@@ -40,6 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({ username, password }),
     })
     setUser(res.user)
+    setSessionExpired(false)
     setStatus('authenticated')
     return res.user
   }, [])
@@ -49,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await api<void>('/auth/logout', { method: 'POST' })
     } finally {
       setUser(null)
+      setSessionExpired(false)
       setStatus('anonymous')
     }
   }, [])
@@ -59,8 +68,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   const value = useMemo(
-    () => ({ status, user, login, logout, hasRole }),
-    [status, user, login, logout, hasRole],
+    () => ({ status, user, sessionExpired, login, logout, hasRole }),
+    [status, user, sessionExpired, login, logout, hasRole],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

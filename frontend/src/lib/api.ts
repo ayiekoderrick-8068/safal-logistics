@@ -1,10 +1,13 @@
 export class ApiError extends Error {
   readonly status: number
+  /** Seconds from a Retry-After header (e.g. sign-in lockout), if the server sent one. */
+  readonly retryAfter: number | null
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, retryAfter: number | null = null) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.retryAfter = retryAfter
   }
 }
 
@@ -47,8 +50,9 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => null)
-    if (res.status === 401 && !path.startsWith('/auth/login')) onUnauthorized?.()
-    throw new ApiError(res.status, errorMessage(res.status, body))
+    if (res.status === 401 && !path.startsWith('/auth/')) onUnauthorized?.()
+    const retry = Number(res.headers.get('Retry-After'))
+    throw new ApiError(res.status, errorMessage(res.status, body), Number.isFinite(retry) && retry > 0 ? retry : null)
   }
   if (res.status === 204) return undefined as T
   return (await res.json()) as T

@@ -56,7 +56,44 @@ describe('login flow', () => {
     await userEvent.type(await screen.findByLabelText('Username or email'), 'derrick')
     await userEvent.type(screen.getByLabelText('Password'), 'wrong')
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Invalid username or password')
+    expect(await screen.findByRole('alert')).toHaveTextContent('The username or password is incorrect.')
+    expect(screen.getByRole('button', { name: 'Sign in' })).toBeEnabled()
+  })
+
+  it('shows a lockout countdown and pauses sign-in after too many attempts', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(401, { detail: 'Not authenticated' }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ detail: 'Too many sign-in attempts. For your security, sign-in is paused.' }), {
+        status: 429, headers: { 'Content-Type': 'application/json', 'Retry-After': '125' },
+      }))
+    renderAt('/login')
+    await userEvent.type(await screen.findByLabelText('Username or email'), 'derrick')
+    await userEvent.type(screen.getByLabelText('Password'), 'wrong')
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Too many sign-in attempts')
+    expect(screen.getByTestId('lockout-countdown')).toHaveTextContent(/^2:0[45]$/)
+    expect(screen.getByRole('button', { name: 'Sign-in paused' })).toBeDisabled()
+  })
+
+  it('explains an expired session and returns the user after signing in again', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(200, ADMIN)) // session check: signed in
+      .mockResolvedValue(jsonResponse(401, { detail: 'Not authenticated' })) // every later call: expired
+    renderAt('/tasks')
+    expect(await screen.findByRole('heading', { name: 'Tasks' })).toBeInTheDocument()
+    // The notification bell polls the API; its 401 ends the session.
+    expect(await screen.findByText('Your session has expired.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+  })
+
+  it('warns when Caps Lock is on', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(401, { detail: 'Not authenticated' }))
+    renderAt('/login')
+    const pw = await screen.findByLabelText('Password')
+    pw.focus()
+    await userEvent.keyboard('{CapsLock}A')
+    expect(await screen.findByText('Caps Lock is on.')).toBeInTheDocument()
+    expect(pw).toHaveAttribute('aria-describedby', 'caps-warning')
   })
 
   it('returns the user to the page they originally requested', async () => {
