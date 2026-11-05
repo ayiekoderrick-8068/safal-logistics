@@ -494,6 +494,25 @@ class Alert(TimestampMixin, Base):
     resolved_by: Mapped[User | None] = relationship(foreign_keys=[resolved_by_id])
 
 
+class AuthThrottle(Base):
+    """Failed sign-in counters for brute-force / credential-stuffing protection.
+
+    key = "acct:<sha256 of normalised identifier>" or "ip:<address>". Identifiers are hashed
+    so mistyped passwords pasted into the username field are never stored in clear text.
+    """
+
+    __tablename__ = "auth_throttles"
+    __table_args__ = (CheckConstraint("failures >= 0", name="failures_non_negative"),)
+
+    key: Mapped[str] = mapped_column(String(120), primary_key=True)
+    failures: Mapped[int] = mapped_column(Integer, default=0)
+    window_started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class ReportRun(Base):
     """History of generated reports/exports. The documents themselves are not stored."""
 

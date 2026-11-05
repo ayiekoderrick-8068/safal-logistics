@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     upload_dir: Path = Path(__file__).resolve().parents[1] / "var" / "uploads"
     max_upload_bytes: int = Field(default=10 * 1024 * 1024, gt=0)
 
+    # Sign-in throttling (per account and per client IP).
+    login_max_failures: int = Field(default=5, ge=1, le=100)
+    login_ip_max_failures: int = Field(default=30, ge=1, le=10_000)
+    login_window_minutes: int = Field(default=15, ge=1, le=1440)
+    login_lockout_minutes: int = Field(default=15, ge=1, le=1440)
+
     # Alerts are re-evaluated on read at most this often (seconds).
     alert_refresh_seconds: int = Field(default=60, ge=0)
 

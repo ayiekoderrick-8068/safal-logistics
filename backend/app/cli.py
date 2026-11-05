@@ -128,6 +128,26 @@ def refresh_alerts_cmd(_: argparse.Namespace) -> int:
     return 0
 
 
+def unlock_login(args: argparse.Namespace) -> int:
+    from .services.throttle import unlock
+
+    if not args.username and not args.ip:
+        print("Give --username and/or --ip.", file=sys.stderr)
+        return 2
+    with SessionLocal() as db:
+        n = unlock(db, identifier=args.username, ip=args.ip)
+        record_event(
+            db,
+            action="auth.unlocked",
+            entity_type="user",
+            summary="Sign-in lock cleared via CLI",
+            changes={"ip": args.ip},
+        )
+        db.commit()
+    print(f"Cleared {n} sign-in counter(s).")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli", description="LogiTrack management")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -149,6 +169,11 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("refresh-alerts", help="Re-evaluate operational alerts (for cron)").set_defaults(
         func=refresh_alerts_cmd
     )
+
+    p = sub.add_parser("unlock-login", help="Clear a sign-in lockout (account and/or IP)")
+    p.add_argument("--username", help="Username or email that is locked out")
+    p.add_argument("--ip", help="Client IP address that is locked out")
+    p.set_defaults(func=unlock_login)
 
     p = sub.add_parser("reset-e2e", help="Rebuild the disposable *_e2e test database")
     p.add_argument("--yes", action="store_true")
