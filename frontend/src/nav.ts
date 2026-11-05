@@ -1,0 +1,197 @@
+import {
+  Activity,
+  BarChart3,
+  ClipboardList,
+  FileText,
+  LayoutDashboard,
+  Megaphone,
+  Send,
+  Settings,
+  ShieldCheck,
+  Timer,
+  Truck,
+  Users,
+  Wallet,
+  Warehouse,
+  type LucideIcon,
+} from 'lucide-react'
+import type { Role } from './lib/types'
+
+export interface PlannedModule {
+  milestone: string
+  features: string[]
+}
+
+export interface NavItem {
+  to: string
+  label: string
+  title: string
+  description: string
+  icon: LucideIcon
+  roles?: Role[]
+  /** Present while the module is not yet built: the page explains what is coming. */
+  planned?: PlannedModule
+}
+
+export interface NavSection {
+  label: string
+  items: NavItem[]
+}
+
+export const NAV: NavSection[] = [
+  {
+    label: 'Dashboard',
+    items: [
+      {
+        to: '/', label: 'Overview', title: 'Operations Overview', icon: LayoutDashboard,
+        description: 'Loading, dispatch and fleet performance at a glance.',
+      },
+      {
+        to: '/reports', label: 'Reports', title: 'Reports & Export', icon: FileText,
+        description: 'Generate, analyse and export operational reports.',
+        planned: {
+          milestone: 'Milestone 6',
+          features: [
+            'Filter by date, vehicle, route, bay and status',
+            'CSV export generated from database records',
+            'PDF report generation',
+            'Quick reports: loading performance, dispatch summary, delay analysis',
+          ],
+        },
+      },
+    ],
+  },
+  {
+    label: 'Operations',
+    items: [
+      {
+        to: '/fleet', label: 'Fleet & Trucks', title: 'Fleet Management', icon: Truck,
+        description: 'Register trucks, assign drivers and track availability.',
+        planned: {
+          milestone: 'Milestone 2',
+          features: [
+            'Register, edit and search trucks',
+            'Assign and reassign drivers',
+            'Track availability and maintenance status',
+          ],
+        },
+      },
+      {
+        to: '/loading-bays', label: 'Loading Bays', title: 'Loading Bays & Scheduling', icon: Warehouse,
+        description: 'Schedule loading and record bay timestamps.',
+        planned: {
+          milestone: 'Milestone 2',
+          features: [
+            'Create loading schedules and assign bays',
+            'Record arrival, loading start, loading finish and departure',
+            'Overlapping bay bookings rejected (already enforced by the database)',
+          ],
+        },
+      },
+      {
+        to: '/dispatch', label: 'Dispatch', title: 'Dispatch Management', icon: Send,
+        description: 'Dispatch trucks, track deliveries and flag delays.',
+        planned: {
+          milestone: 'Milestone 2',
+          features: [
+            'Create dispatch records with truck and route',
+            'Update delivery status and record actual arrival',
+            'Automatic delay flagging against expected arrival',
+          ],
+        },
+      },
+      {
+        to: '/tasks', label: 'Tasks', title: 'Tasks', icon: ClipboardList,
+        description: 'Operational task assignments.',
+        planned: { milestone: 'Backlog', features: ['Assign and track operational tasks per shift'] },
+      },
+    ],
+  },
+  {
+    label: 'Analytics',
+    items: [
+      {
+        to: '/turnaround', label: 'Turnaround Analytics', title: 'Turnaround-Time Analytics', icon: BarChart3,
+        description: 'Measure loading turnaround and identify delay causes.',
+        planned: {
+          milestone: 'Milestone 3',
+          features: [
+            'Turnaround trend vs configurable target',
+            'Turnaround and utilisation by loading bay',
+            'Recurring delay-cause breakdown',
+          ],
+        },
+      },
+      {
+        to: '/delays', label: 'Delay Reports', title: 'Delay Reports', icon: Timer,
+        description: 'Log and investigate loading and dispatch delays.',
+        planned: {
+          milestone: 'Milestone 3',
+          features: ['Record delay incidents with cause', 'Track investigation status to resolution'],
+        },
+      },
+    ],
+  },
+  {
+    label: 'Management',
+    items: [
+      {
+        to: '/compliance', label: 'Compliance', title: 'Compliance Records', icon: ShieldCheck,
+        description: 'Vehicle documents, inspections and renewals.',
+        planned: {
+          milestone: 'Milestone 4',
+          features: [
+            'Track insurance, licences, inspections and roadworthiness',
+            'Upcoming-expiry alerts',
+            'Changes restricted to Compliance and Admin roles, with audit trail',
+          ],
+        },
+      },
+      {
+        to: '/finance', label: 'Finance', title: 'Finance', icon: Wallet,
+        description: 'Trip costs and billing.',
+        planned: { milestone: 'Backlog', features: ['Trip cost tracking', 'Fuel and maintenance spend'] },
+      },
+      {
+        to: '/announcements', label: 'Announcements', title: 'Announcements', icon: Megaphone,
+        description: 'Operational notices for staff.',
+        planned: { milestone: 'Backlog', features: ['Post notices to operations staff'] },
+      },
+    ],
+  },
+  {
+    label: 'System',
+    items: [
+      {
+        to: '/users', label: 'User Management', title: 'User Management', icon: Users, roles: ['admin'],
+        description: 'Manage system users, roles and access permissions.',
+        planned: {
+          milestone: 'Milestone 5',
+          features: [
+            'Create, edit, activate and deactivate users',
+            'Administrator, Operations, Fleet Manager, Compliance and Viewer roles',
+            'Role-based permissions (already enforced by the API)',
+          ],
+        },
+      },
+      {
+        to: '/activity-log', label: 'Activity Log', title: 'Activity Log', icon: Activity, roles: ['admin'],
+        description: 'Audit trail of important changes.',
+        planned: {
+          milestone: 'Milestone 5',
+          features: ['Browse audit events (sign-ins and record changes are already being recorded)'],
+        },
+      },
+      {
+        to: '/settings', label: 'Settings', title: 'System Settings', icon: Settings, roles: ['admin'],
+        description: 'Targets, security and system preferences.',
+        planned: {
+          milestone: 'Milestone 5',
+          features: ['Configure turnaround targets', 'Password and session policy'],
+        },
+      },
+    ],
+  },
+]
+
+export const ALL_NAV_ITEMS = NAV.flatMap((s) => s.items)

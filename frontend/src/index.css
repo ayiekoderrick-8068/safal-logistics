@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Segoe UI", "Inter", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+
+  /* LogiTrack palette (from the approved UI concepts) */
+  --color-ink: #0f2b3d;           /* headings / primary text */
+  --color-ink-muted: #4a6272;
+  --color-sidebar: #0b3446;
+  --color-sidebar-deep: #082736;
+  --color-topbar: #0a2d40;
+  --color-topbar-end: #0e566b;
+  --color-accent: #1bb3d1;        /* active nav, highlights */
+  --color-accent-strong: #129ab8;
+  --color-primary: #0e6481;       /* primary buttons */
+  --color-primary-hover: #0b5069;
+  --color-line: #e3eef3;          /* card borders / table rules */
+  --color-surface-muted: #f3f8fb; /* table headers */
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    @apply bg-sidebar-deep text-ink;
+  }
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+}
+
+@utility workspace-gradient {
+  background: linear-gradient(135deg, #eef9fd 0%, #d6f2fa 38%, #aee6f4 72%, #8fdaee 100%);
+}
+
+@utility sidebar-gradient {
+  background: linear-gradient(180deg, #0c3a4e 0%, #0a3043 55%, #082736 100%);
+}
+
+@utility topbar-gradient {
+  background: linear-gradient(90deg, #0a2d40 0%, #0b3a50 55%, #0e566b 100%);
+}
+
+@utility nav-active {
+  background: linear-gradient(90deg, #17a5c4 0%, #22c0dd 100%);
+  box-shadow: 0 6px 16px -6px rgb(27 179 209 / 0.7);
+}
+
+@utility card {
+  @apply rounded-2xl border border-white/70 bg-white shadow-[0_4px_20px_-8px_rgba(15,43,61,0.18)];
+}
