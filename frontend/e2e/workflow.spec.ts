@@ -131,6 +131,69 @@ test('truck registration through delivery records turnaround', async ({ page }) 
   await expect(page.getByRole('row', { name: new RegExp(REG) })).toContainText('Nairobi →')
 })
 
+test('reports reflect the recorded workflow and export CSV and PDF', async ({ page }) => {
+  await signIn(page)
+  // Record a delay against the truck that completed the workflow above.
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Delay Reports' }).click()
+  await page.getByRole('button', { name: 'Report Delay' }).click()
+  const dlg = page.getByRole('dialog')
+  await dlg.getByLabel('Dispatch / delivery').check()
+  const op = dlg.getByLabel('Dispatch', { exact: true })
+  await op.selectOption(await op.locator('option', { hasText: REG }).first().getAttribute('value') ?? '')
+  await dlg.getByLabel('Delay category').selectOption('documentation')
+  await dlg.getByLabel('Estimated impact (minutes)').fill('25')
+  await dlg.getByLabel('Description').fill('E2E: missing delivery note')
+  await dlg.getByRole('button', { name: 'Report delay' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Delay reported' })).toBeVisible()
+
+  // Open analytics filtered to today and this truck.
+  await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Reports', exact: true }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Reports & Export' })).toBeVisible()
+  await page.getByLabel('Period').selectOption('today')
+  await page.getByLabel('Truck').selectOption({ label: REG })
+  await page.getByRole('button', { name: 'Apply Filters' }).click()
+  await expect(page).toHaveURL(/period=today&truck_id=\d+/)
+  const kpi = (name: string) => page.getByRole('article', { name }).getByTestId('stat-value')
+  await expect(kpi('Loads Processed')).toHaveText('1')
+  await expect(kpi('Completed Dispatches')).toHaveText('1')
+  await expect(kpi('On-Time Delivery')).toHaveText('100.0%')
+  await expect(page.getByRole('article', { name: 'Delayed Loads' })).toContainText('1 delay incidents')
+
+  await page.getByRole('tab', { name: 'Delays' }).click()
+  await expect(page.getByRole('article', { name: 'Delay incidents' }).getByTestId('stat-value')).toHaveText('1')
+
+  await page.getByRole('tab', { name: 'Records & Export' }).click()
+  await expect(page.getByRole('row', { name: new RegExp(REG) })).toHaveCount(1)
+
+  // CSV download contains the filtered record with ISO timestamps.
+  const [csvDownload] = await Promise.all([
+    page.waitForEvent('download'), page.getByRole('link', { name: 'Export CSV' }).click(),
+  ])
+  expect(csvDownload.suggestedFilename()).toMatch(/^logitrack-turnaround-\d{8}-\d{8}\.csv$/)
+  const csvText = Buffer.concat(await (async () => {
+    const chunks: Buffer[] = []
+    for await (const c of await csvDownload.createReadStream()) chunks.push(c as Buffer)
+    return chunks
+  })()).toString('utf8')
+  expect(csvText).toContain('Yard turnaround (min)')
+  expect(csvText).toContain(`# Truck,${REG}`)
+  expect(csvText).toMatch(new RegExp(`,${REG},.*\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\+03:00`))
+
+  // PDF download is a real PDF.
+  const [pdfDownload] = await Promise.all([
+    page.waitForEvent('download'), page.getByRole('link', { name: 'Export PDF' }).click(),
+  ])
+  expect(pdfDownload.suggestedFilename()).toMatch(/\.pdf$/)
+  const pdfStream = await pdfDownload.createReadStream()
+  const first = await new Promise<Buffer>((resolve) => pdfStream.once('data', (c) => resolve(c as Buffer)))
+  expect(first.subarray(0, 5).toString()).toBe('%PDF-')
+
+  // Both downloads appear in the recent report activity.
+  await page.getByRole('tab', { name: 'Overview' }).click()
+  await expect(page.getByText('Recent Report Activity')).toBeVisible()
+  await expect(page.getByText('Loading turnaround records')).toBeVisible({ timeout: 20_000 })
+})
+
 test('a delay can be reported, assigned and resolved with accurate timing', async ({ page }) => {
   await signIn(page)
   await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('link', { name: 'Delay Reports' }).click()

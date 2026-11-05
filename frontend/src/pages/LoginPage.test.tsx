@@ -63,11 +63,11 @@ describe('login flow', () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse(401, { detail: 'Not authenticated' }))
       .mockResolvedValueOnce(jsonResponse(200, { user: ADMIN, expires_in_seconds: 3600 }))
-    renderAt('/reports')
+    renderAt('/tasks')
     await userEvent.type(await screen.findByLabelText('Username or email'), 'derrick')
     await userEvent.type(screen.getByLabelText('Password'), 'Secret-123!')
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
-    expect(await screen.findByRole('heading', { name: 'Reports & Export' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Tasks' })).toBeInTheDocument()
     expect(screen.getByText('This module is under construction')).toBeInTheDocument()
 
     const [url, init] = fetchMock.mock.calls[1]
