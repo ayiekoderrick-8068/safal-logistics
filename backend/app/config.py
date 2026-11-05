@@ -1,8 +1,9 @@
 from functools import lru_cache
 from zoneinfo import ZoneInfo
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import make_url
 
 
 class Settings(BaseSettings):
@@ -16,6 +17,8 @@ class Settings(BaseSettings):
 
     database_url: str
     test_database_url: str | None = None
+    # Optional override of just the database name in database_url (used for the e2e DB).
+    database_name: str | None = Field(default=None, pattern=r"^[a-z0-9_]+$")
 
     jwt_secret: str = Field(min_length=32)
     jwt_algorithm: str = "HS256"
@@ -26,6 +29,15 @@ class Settings(BaseSettings):
     timezone: str = "Africa/Nairobi"
     default_turnaround_target_minutes: int = Field(default=120, gt=0)
     bay_operating_hours_per_day: int = Field(default=12, gt=0, le=24)
+    # Minutes of lateness tolerated before a load/delivery counts as delayed.
+    delay_grace_minutes: int = Field(default=15, ge=0, le=240)
+
+    @model_validator(mode="after")
+    def _apply_database_name(self) -> Settings:
+        if self.database_name:
+            url = make_url(self.database_url).set(database=self.database_name)
+            self.database_url = url.render_as_string(hide_password=False)
+        return self
 
     @property
     def tz(self) -> ZoneInfo:

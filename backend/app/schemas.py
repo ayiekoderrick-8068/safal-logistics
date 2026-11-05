@@ -41,6 +41,7 @@ class MetaOut(BaseModel):
     version: str
     timezone: str
     turnaround_target_minutes: int
+    delay_grace_minutes: int
     sample_data: bool
 
 

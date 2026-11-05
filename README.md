@@ -113,12 +113,67 @@ cd backend && uv run pytest && uv run ruff check .
 # Frontend unit/component tests, type check and lint
 cd frontend && npm test && npm run typecheck && npm run lint
 
-# End-to-end: builds the app and starts backend + preview server automatically
-cd frontend && npx playwright install chromium
-E2E_USERNAME=<user> E2E_PASSWORD=<password> npm run e2e
+# End-to-end: rebuilds an isolated `logitrack_e2e` database (migrations + sample data +
+# a throwaway admin with a per-run random password), builds the app, starts the API on
+# :8091 and the preview server on :4190. Your development database is never touched.
+cd frontend && npx playwright install chromium && npm run e2e
 ```
 
+## Operational workflow (Milestone 2)
+
+1. **Fleet & Trucks.** Register drivers and trucks (registration is normalised, e.g.
+   `kca 204t` → `KCA 204T`). Assign or reassign drivers, and put trucks into maintenance or
+   out of service.
+2. **Loading Bays.** Book a bay for an available truck. Overlapping bookings for the same
+   bay or the same truck are rejected with a message naming the conflict. Trucks in
+   maintenance can't be booked.
+3. **Record the loading times:** *Record arrival → Start loading → Finish loading*.
+   - Each time defaults to now and can be corrected if entered late.
+   - Times can't be in the future and can't be earlier than the previous step.
+   - Recording the arrival sets the truck to *loading*.
+4. **Dispatch.** Pick a loaded truck and a route. The dispatch time becomes the departure,
+   which closes the turnaround (`departure − arrival`). The ETA is calculated from the
+   route's expected duration, and the truck becomes *in transit*.
+5. **Deliver.**
+   - Record the actual arrival.
+   - Deliveries more than the grace period late (default 15 min, setting
+     `LOGITRACK_DELAY_GRACE_MINUTES`) are flagged as delayed. A **delay cause is required**
+     and is recorded as a delay incident for recurring-cause analysis.
+   - Trips in transit can also be flagged as delayed early.
+   - When the delivery is recorded, the truck becomes *available* again.
+
+Every step is written to the audit log with the acting user. Role permissions:
+
+| Action | Roles |
+|--------|-------|
+| Register and edit drivers and trucks | Fleet Manager, Administrator |
+| Bays, routes, schedules, loading times, dispatch, delivery | Operations, Administrator |
+| View everything | All signed-in roles |
+
 ## Project status
+
+### Working (Milestone 2)
+
+- **Fleet Management.** Truck register with search, status filter and pagination. Truck
+  detail panel showing driver, last route, capacity, loads and average turnaround over the
+  last 30 days, and next compliance expiry. Add, edit and reassign trucks, add drivers, and
+  set maintenance or out-of-service status.
+- **Loading Bays & Scheduling:**
+  - KPIs for the selected day, an hourly scheduled-vs-completed chart, and a live
+    bay-utilisation donut.
+  - Bay status cards with booking progress, upcoming loads, and alerts for late or
+    overrunning loads.
+  - A schedule table with bay and status filters and step-by-step workflow actions.
+- **Dispatch Management:**
+  - KPIs, an hourly status chart, today's status breakdown, alerts, and 7-day performance
+    (on-time %, delayed %, average delivery duration).
+  - A monitoring table with status and route filters and the Delivered / Flag delay actions.
+- **Turnaround** is calculated from recorded timestamps and compared with each bay's
+  target, falling back to the global target. It appears in the schedule and dispatch tables,
+  the truck panel and the Overview.
+- **"On-time"** has one definition everywhere: arrival ≤ ETA + grace period.
+- **Tests:** 48 backend, 26 frontend unit/component, and 10 end-to-end. The end-to-end suite
+  includes the full workflow driven through the UI and a bay double-booking rejection.
 
 ### Working (Milestone 1)
 
@@ -141,18 +196,26 @@ E2E_USERNAME=<user> E2E_PASSWORD=<password> npm run e2e
 
 ### Sample / not live
 
-- The dashboard figures currently come from the generated sample dataset, which is flagged in
-  the UI. There are no data-entry screens yet, so real records can't be added through the app.
+- The local database can hold the generated sample dataset, which is flagged in the UI with
+  a banner.
+- Records you enter through the app are real rows, but while the sample dataset is loaded
+  they sit alongside it. `clear-sample` deletes **all** operational records, so clear the
+  sample before entering real data.
 
 ### Not built yet (pages exist and say so; they show no figures)
 
 | Milestone | Scope |
 |-----------|-------|
-| 2 | Core workflow: register truck → schedule loading → record loading times → dispatch → complete delivery → turnaround |
 | 3 | Turnaround analytics and delay reports pages |
 | 4 | Compliance records management and expiry alerts workflow |
 | 5 | User management UI, activity log viewer, settings (targets, policies) |
 | 6 | Reports: filtering, CSV export, PDF reports |
 
-Also outstanding: login rate limiting, notifications, global record search, and a Tasks,
-Finance and Announcements backlog.
+Also outstanding:
+- Login rate limiting, notifications, and global record search.
+- Fleet export (it belongs with Reports).
+- Editing or deleting bays and routes (they can only be created for now).
+- Truck photos, mileage and service-date fields shown in the design. They need new fields
+  first, so the panel shows an illustration instead.
+- The Tasks, Finance and Announcements backlog.
+- A Login screen design. The current sign-in page is provisional, pending an approved design.

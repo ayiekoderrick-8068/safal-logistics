@@ -255,6 +255,7 @@ class LoadingSchedule(TimestampMixin, Base):
 
     truck: Mapped[Truck] = relationship()
     bay: Mapped[LoadingBay] = relationship()
+    dispatch: Mapped[Dispatch | None] = relationship(back_populates="schedule")
 
 
 class Dispatch(TimestampMixin, Base):
@@ -290,7 +291,7 @@ class Dispatch(TimestampMixin, Base):
 
     truck: Mapped[Truck] = relationship()
     route: Mapped[Route] = relationship()
-    schedule: Mapped[LoadingSchedule | None] = relationship()
+    schedule: Mapped[LoadingSchedule | None] = relationship(back_populates="dispatch")
 
 
 class DelayIncident(TimestampMixin, Base):

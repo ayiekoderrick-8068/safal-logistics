@@ -97,36 +97,46 @@ export function PerformanceTrendChart({
 export function StatusDonut({
   rows,
   centerLabel,
+  centerValue,
+  colors,
+  labels,
 }: {
   rows: { status: string; count: number }[]
   centerLabel: string
+  centerValue?: string
+  colors?: Record<string, string>
+  labels?: Record<string, string>
 }) {
   const total = rows.reduce((s, r) => s + r.count, 0)
+  const color = (status: string) => colors?.[status] ?? statusColor(status)
   return (
     <div className="flex flex-col items-center gap-5 sm:flex-row">
       <div className="relative size-48 shrink-0" role="img" aria-label={`${total} ${centerLabel} by status`}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
-            <Pie data={rows} dataKey="count" nameKey="status" innerRadius="62%" outerRadius="100%"
-              startAngle={90} endAngle={-270} stroke="#fff" strokeWidth={2} isAnimationActive={false}>
-              {rows.map((r) => (
-                <Cell key={r.status} fill={statusColor(r.status)} />
+            <Pie data={rows.filter((r) => r.count > 0)} dataKey="count" nameKey="status" innerRadius="62%"
+              outerRadius="100%" startAngle={90} endAngle={-270} stroke="#fff" strokeWidth={2} isAnimationActive={false}>
+              {rows.filter((r) => r.count > 0).map((r) => (
+                <Cell key={r.status} fill={color(r.status)} />
               ))}
             </Pie>
           </PieChart>
         </ResponsiveContainer>
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-3xl font-bold text-ink">{total}</span>
+          <span className="text-3xl font-bold text-ink">{centerValue ?? total}</span>
           <span className="text-sm text-ink">{centerLabel}</span>
         </div>
       </div>
       <ul className="w-full space-y-2.5">
         {rows.map((r) => (
           <li key={r.status} className="flex items-center gap-2.5 text-[0.95rem] text-ink">
-            <span className="size-3.5 rounded-full" style={{ background: statusColor(r.status) }} aria-hidden />
-            <span>{humanize(r.status)}</span>
+            <span className="size-3.5 rounded-full" style={{ background: color(r.status) }} aria-hidden />
+            <span>{labels?.[r.status] ?? humanize(r.status)}</span>
             <span className="ml-auto font-semibold">
-              {r.count} <span className="font-normal text-ink-muted">({((r.count / total) * 100).toFixed(1)}%)</span>
+              {r.count}{' '}
+              <span className="font-normal text-ink-muted">
+                ({total ? ((r.count / total) * 100).toFixed(1) : '0.0'}%)
+              </span>
             </span>
           </li>
         ))}

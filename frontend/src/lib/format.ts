@@ -86,6 +86,15 @@ export const ROLE_LABELS: Record<string, string> = {
   viewer: 'Viewer',
 }
 
+export const DELAY_CAUSE_LABELS: Record<string, string> = {
+  loading_congestion: 'Loading congestion',
+  documentation: 'Documentation issue',
+  truck_unavailability: 'Truck unavailability',
+  equipment_breakdown: 'Equipment breakdown',
+  traffic: 'Traffic / road conditions',
+  other: 'Other',
+}
+
 export function humanize(value: string): string {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }

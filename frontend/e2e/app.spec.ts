@@ -1,9 +1,8 @@
 import { expect, test, type Page } from '@playwright/test'
 
+// Provided by playwright.config.ts (throwaway admin in the isolated e2e database).
 const USERNAME = process.env.E2E_USERNAME
 const PASSWORD = process.env.E2E_PASSWORD
-
-test.skip(!USERNAME || !PASSWORD, 'Set E2E_USERNAME and E2E_PASSWORD to run end-to-end tests')
 
 async function signIn(page: Page) {
   await page.goto('/login')

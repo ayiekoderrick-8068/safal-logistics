@@ -67,38 +67,14 @@ export const NAV: NavSection[] = [
       {
         to: '/fleet', label: 'Fleet & Trucks', title: 'Fleet Management', icon: Truck,
         description: 'Register trucks, assign drivers and track availability.',
-        planned: {
-          milestone: 'Milestone 2',
-          features: [
-            'Register, edit and search trucks',
-            'Assign and reassign drivers',
-            'Track availability and maintenance status',
-          ],
-        },
       },
       {
         to: '/loading-bays', label: 'Loading Bays', title: 'Loading Bays & Scheduling', icon: Warehouse,
         description: 'Schedule loading and record bay timestamps.',
-        planned: {
-          milestone: 'Milestone 2',
-          features: [
-            'Create loading schedules and assign bays',
-            'Record arrival, loading start, loading finish and departure',
-            'Overlapping bay bookings rejected (already enforced by the database)',
-          ],
-        },
       },
       {
         to: '/dispatch', label: 'Dispatch', title: 'Dispatch Management', icon: Send,
         description: 'Dispatch trucks, track deliveries and flag delays.',
-        planned: {
-          milestone: 'Milestone 2',
-          features: [
-            'Create dispatch records with truck and route',
-            'Update delivery status and record actual arrival',
-            'Automatic delay flagging against expected arrival',
-          ],
-        },
       },
       {
         to: '/tasks', label: 'Tasks', title: 'Tasks', icon: ClipboardList,

@@ -32,5 +32,6 @@ def meta(db: Session = Depends(get_db), _: User = Depends(get_current_user)) -> 
         version=__version__,
         timezone=get_settings().timezone,
         turnaround_target_minutes=turnaround_target_minutes(db),
+        delay_grace_minutes=get_settings().delay_grace_minutes,
         sample_data=is_sample_data(db),
     )

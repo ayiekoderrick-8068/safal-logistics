@@ -104,6 +104,21 @@ def clear_sample(args: argparse.Namespace) -> int:
     return 0
 
 
+def reset_e2e(args: argparse.Namespace) -> int:
+    from .e2e_db import reset_e2e_database
+
+    if not args.yes:
+        print("Pass --yes to confirm rebuilding the e2e database.", file=sys.stderr)
+        return 2
+    try:
+        name = reset_e2e_database()
+    except RuntimeError as exc:
+        print(exc, file=sys.stderr)
+        return 1
+    print(f"E2E database '{name}' rebuilt.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli", description="LogiTrack management")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -121,6 +136,10 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("clear-sample", help="Delete the sample dataset")
     p.add_argument("--yes", action="store_true")
     p.set_defaults(func=clear_sample)
+
+    p = sub.add_parser("reset-e2e", help="Rebuild the disposable *_e2e test database")
+    p.add_argument("--yes", action="store_true")
+    p.set_defaults(func=reset_e2e)
 
     args = parser.parse_args(argv)
     return args.func(args)

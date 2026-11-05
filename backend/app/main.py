@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
 from .config import get_settings
-from .routers import auth, dashboard, system
+from .routers import auth, dashboard, dispatch, fleet, loading, system
 
 
 def create_app() -> FastAPI:
@@ -23,6 +23,9 @@ def create_app() -> FastAPI:
     app.include_router(system.router)
     app.include_router(auth.router)
     app.include_router(dashboard.router)
+    app.include_router(fleet.router)
+    app.include_router(loading.router)
+    app.include_router(dispatch.router)
     return app
 
 

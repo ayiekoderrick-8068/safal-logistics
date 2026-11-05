@@ -15,6 +15,175 @@ export interface Meta {
   version: string
   timezone: string
   turnaround_target_minutes: number
+  delay_grace_minutes: number
+  sample_data: boolean
+}
+
+export interface Page<T> {
+  items: T[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export interface Ref {
+  id: number
+  label: string
+}
+
+export type TruckStatus = 'available' | 'loading' | 'in_transit' | 'maintenance' | 'out_of_service'
+export type ScheduleStatus = 'scheduled' | 'arrived' | 'loading' | 'loaded' | 'departed' | 'cancelled'
+export type DispatchStatus = 'pending' | 'in_transit' | 'delivered' | 'cancelled'
+export type DelayCause =
+  | 'loading_congestion'
+  | 'documentation'
+  | 'truck_unavailability'
+  | 'equipment_breakdown'
+  | 'traffic'
+  | 'other'
+
+export interface Driver {
+  id: number
+  full_name: string
+  phone: string | null
+  licence_number: string
+  licence_expiry: string | null
+  is_active: boolean
+  truck_id: number | null
+  truck_registration: string | null
+}
+
+export interface Truck {
+  id: number
+  registration: string
+  make: string | null
+  model: string | null
+  capacity_tonnes: number
+  status: TruckStatus
+  driver: Ref | null
+  last_route: string | null
+  last_dispatched_at: string | null
+  compliance: {
+    status: 'valid' | 'expiring' | 'overdue' | 'missing'
+    next_expiry: string | null
+    next_expiry_type: string | null
+  }
+}
+
+export interface TruckDetail extends Truck {
+  documents: { doc_type: string; reference_number: string; expires_on: string; days_remaining: number }[]
+  loads_completed_30d: number
+  avg_turnaround_30d: number | null
+}
+
+export interface FleetSummary {
+  total: number
+  available: number
+  loading: number
+  in_transit: number
+  maintenance: number
+  out_of_service: number
+  compliance_due: number
+  availability_pct: number | null
+}
+
+export interface Route {
+  id: number
+  origin: string
+  destination: string
+  label: string
+  distance_km: number
+  expected_duration_minutes: number
+  is_active: boolean
+}
+
+export interface Bay {
+  id: number
+  code: string
+  name: string
+  target_turnaround_minutes: number | null
+  effective_target_minutes: number
+  is_active: boolean
+}
+
+export interface Schedule {
+  id: number
+  truck: Ref
+  driver_name: string | null
+  bay: Ref
+  scheduled_start: string
+  scheduled_end: string
+  arrival_at: string | null
+  loading_started_at: string | null
+  loading_finished_at: string | null
+  departed_at: string | null
+  status: ScheduleStatus
+  notes: string | null
+  loading_minutes: number | null
+  turnaround_minutes: number | null
+  target_minutes: number
+  within_target: boolean | null
+  is_late: boolean
+  late_minutes: number
+  dispatch_id: number | null
+  load_ref: string | null
+}
+
+export interface LoadingOverview {
+  date: string
+  active_bays: number
+  total_bays: number
+  scheduled_count: number
+  completed_count: number
+  avg_loading_minutes: number | null
+  avg_loading_minutes_previous_day: number | null
+  avg_turnaround_minutes: number | null
+  late_count: number
+  hourly: { hour: number; scheduled: number; completed: number }[]
+  bay_board: {
+    bay: Bay
+    state: 'in_use' | 'reserved' | 'available' | 'inactive'
+    schedule: Schedule | null
+    progress_pct: number | null
+  }[]
+  upcoming: Schedule[]
+  late: Schedule[]
+  sample_data: boolean
+}
+
+export interface Dispatch {
+  id: number
+  load_ref: string
+  schedule_id: number | null
+  truck: Ref
+  driver_name: string | null
+  route: Ref
+  dispatched_at: string
+  expected_arrival_at: string
+  actual_arrival_at: string | null
+  status: DispatchStatus
+  is_delayed: boolean
+  is_overdue: boolean
+  delay_minutes: number
+  delivery_minutes: number | null
+  turnaround_minutes: number | null
+  delay_cause: DelayCause | null
+}
+
+export interface DispatchOverview {
+  date: string
+  active: number
+  in_transit: number
+  delayed_active: number
+  delivered_today: number
+  delivered_previous_day: number
+  on_time_rate_7d: number | null
+  on_time_rate_prev_7d: number | null
+  delayed_rate_7d: number | null
+  avg_delivery_minutes_7d: number | null
+  status_breakdown: { status: string; count: number }[]
+  hourly: { hour: number; delivered: number; in_transit: number; delayed: number }[]
+  alerts: Dispatch[]
   sample_data: boolean
 }
 

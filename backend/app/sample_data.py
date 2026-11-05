@@ -111,6 +111,7 @@ def load_sample_data(db: Session, today: date | None = None, seed: int = 2026) -
         )
     rng = random.Random(seed)
     tz = get_settings().tz
+    grace_minutes = get_settings().delay_grace_minutes
     today = today or datetime.now(tz).date()
     now = datetime.now(UTC)
 
@@ -209,10 +210,10 @@ def load_sample_data(db: Session, today: date | None = None, seed: int = 2026) -
                 load_no += 1
                 if actual <= now:
                     dispatch.actual_arrival_at, dispatch.status = actual, DispatchStatus.DELIVERED
-                    dispatch.is_delayed = lateness > 30
+                    dispatch.is_delayed = lateness > grace_minutes
                 else:
                     truck.status = TruckStatus.IN_TRANSIT
-                    dispatch.is_delayed = now > expected + timedelta(minutes=30)
+                    dispatch.is_delayed = now > expected + timedelta(minutes=grace_minutes)
                 busy_until[truck.id] = expected + timedelta(minutes=route.expected_duration_minutes)
                 db.add(dispatch)
                 counts["dispatches"] += 1

@@ -8,6 +8,10 @@ export const STATUS_COLORS: Record<string, string> = {
   loading: '#3b82f6',
   maintenance: '#ef4444',
   out_of_service: '#94a3b8',
+  delayed: '#ef4444',
+  in_use: '#16a34a',
+  reserved: '#f59e0b',
+  inactive: '#ef4444',
 }
 
 export function statusColor(status: string): string {
@@ -27,6 +31,17 @@ const STATUS_TONES: Record<string, Tone> = {
   in_progress: 'amber',
   expiring_soon: 'amber',
   loading: 'blue',
+  arrived: 'blue',
+  in_use: 'blue',
+  loaded: 'green',
+  departed: 'green',
+  valid: 'green',
+  completed: 'green',
+  reserved: 'amber',
+  expiring: 'amber',
+  missing: 'slate',
+  inactive: 'slate',
+  late: 'red',
   pending: 'slate',
   scheduled: 'slate',
   cancelled: 'slate',

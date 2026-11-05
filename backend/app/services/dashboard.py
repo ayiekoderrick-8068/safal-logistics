@@ -4,7 +4,7 @@ Definitions (also documented in README):
 - Loads processed: loading schedules that departed within the period (not cancelled).
 - Turnaround: departed_at - arrival_at. Target is the bay override or the global target.
 - On-time delivery: delivered dispatches arriving within the period whose actual arrival
-  is on or before the expected arrival.
+  is no later than expected arrival + the configured grace (default 15 min).
 - Bay utilisation: occupied bay time (arrival -> departure, clipped to the period) divided
   by active bays x days x configured operating hours per day. Capped at 100%.
 """
@@ -66,6 +66,11 @@ def _completed_loads(s: datetime, e: datetime) -> list[ColumnElement[bool]]:
     ]
 
 
+def _on_time() -> ColumnElement[bool]:
+    grace = timedelta(minutes=get_settings().delay_grace_minutes)
+    return Dispatch.actual_arrival_at <= Dispatch.expected_arrival_at + grace
+
+
 def _f(value: object) -> float | None:
     return None if value is None else round(float(value), 1)  # type: ignore[arg-type]
 
@@ -88,9 +93,7 @@ def _period_kpis(db: Session, s: datetime, e: datetime, target: int) -> dict[str
     delivered, on_time = db.execute(
         select(
             func.count(Dispatch.id),
-            func.count(Dispatch.id).filter(
-                Dispatch.actual_arrival_at <= Dispatch.expected_arrival_at
-            ),
+            func.count(Dispatch.id).filter(_on_time()),
         ).where(
             Dispatch.status == DispatchStatus.DELIVERED,
             Dispatch.actual_arrival_at >= s,
@@ -161,9 +164,7 @@ def _trend(
             select(
                 arr_day,
                 func.count(Dispatch.id).label("n"),
-                func.count(Dispatch.id)
-                .filter(Dispatch.actual_arrival_at <= Dispatch.expected_arrival_at)
-                .label("on_time"),
+                func.count(Dispatch.id).filter(_on_time()).label("on_time"),
             )
             .where(
                 Dispatch.status == DispatchStatus.DELIVERED,
