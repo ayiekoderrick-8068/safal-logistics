@@ -21,6 +21,7 @@ const DispatchPage = lazy(() => import('./pages/dispatch/DispatchPage').then((m)
 const TurnaroundAnalyticsPage = lazy(() =>
   import('./pages/turnaround/TurnaroundAnalyticsPage').then((m) => ({ default: m.TurnaroundAnalyticsPage })),
 )
+const ReportsPage = lazy(() => import('./pages/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })))
 const AlertsPage = lazy(() => import('./pages/alerts/AlertsPage').then((m) => ({ default: m.AlertsPage })))
 const DelayReportsPage = lazy(() => import('./pages/delays/DelayReportsPage').then((m) => ({ default: m.DelayReportsPage })))
 const ComplianceRecordsPage = lazy(() =>
@@ -55,6 +56,7 @@ export function AppRoutes() {
         <Route path="compliance" element={<Lazy><ComplianceRecordsPage /></Lazy>} />
         <Route path="delays" element={<Lazy><DelayReportsPage /></Lazy>} />
         <Route path="alerts" element={<Lazy><AlertsPage /></Lazy>} />
+        <Route path="reports" element={<Lazy><ReportsPage /></Lazy>} />
         <Route path="turnaround" element={<Lazy><TurnaroundAnalyticsPage /></Lazy>} />
         {ALL_NAV_ITEMS.filter((i) => i.planned).map((item) => (
           <Route key={item.to} path={item.to.slice(1)} element={<ModuleRoute item={item} />} />

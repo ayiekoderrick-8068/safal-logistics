@@ -49,15 +49,6 @@ export const NAV: NavSection[] = [
       {
         to: '/reports', label: 'Reports', title: 'Reports & Export', icon: FileText,
         description: 'Generate, analyse and export operational reports.',
-        planned: {
-          milestone: 'Milestone 6',
-          features: [
-            'Filter by date, vehicle, route, bay and status',
-            'CSV export generated from database records',
-            'PDF report generation',
-            'Quick reports: loading performance, dispatch summary, delay analysis',
-          ],
-        },
       },
     ],
   },
