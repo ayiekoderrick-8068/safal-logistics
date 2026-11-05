@@ -1,9 +1,10 @@
-import { Bell, ChevronDown, LogOut, Menu, Search } from 'lucide-react'
+import { ChevronDown, LogOut, Menu, Search } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { useAuth } from '../../auth/context'
 import { initials, ROLE_LABELS } from '../../lib/format'
 import { ALL_NAV_ITEMS } from '../../nav'
+import { NotificationBell } from './NotificationBell'
 
 export function Topbar({ onToggleNav }: { onToggleNav: () => void }) {
   const { user, logout, hasRole } = useAuth()
@@ -71,15 +72,7 @@ export function Topbar({ onToggleNav }: { onToggleNav: () => void }) {
       </form>
 
       <div className="ml-auto flex items-center gap-3">
-        <button
-          type="button"
-          disabled
-          title="Notifications arrive in a later milestone"
-          className="rounded-lg p-2 text-white/90 disabled:cursor-not-allowed"
-          aria-label="Notifications (not yet available)"
-        >
-          <Bell className="size-6" />
-        </button>
+        <NotificationBell />
 
         <div className="relative" ref={menuRef}>
           <button

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useAuth } from '../../auth/context'
+import { AlertList } from '../../components/alerts/AlertList'
 import { btnPrimary, btnSecondary, btnSmallGhost, btnSmallPrimary } from '../../components/ui/buttons'
 import { Card, CardHeader } from '../../components/ui/Card'
 import { ConfirmModal } from '../../components/ui/ConfirmModal'
@@ -221,8 +222,10 @@ export function LoadingBaysPage() {
               )}
             </Card>
             <Card>
-              <CardHeader title="Recent Delays & Alerts" subtitle="Loads that missed their start or are overrunning." />
-              {o.late.length === 0 ? <EmptyState title="No loading delays" /> : (
+              <CardHeader title="Recent Delays & Alerts" subtitle="Loading alerts, and loads that missed their start or are overrunning." />
+              <AlertList query="types=loading_over_target,missed_dispatch" limit={4} compact emptyTitle="No loading alerts" version={version} />
+              <h3 className="mt-4 mb-2 text-sm font-semibold text-ink">Behind schedule today</h3>
+              {o.late.length === 0 ? <p className="text-sm text-ink-muted">No loads behind schedule.</p> : (
                 <ul className="space-y-2.5">
                   {o.late.map((s) => (
                     <li key={s.id} className="flex items-start gap-3 rounded-xl border border-red-100 bg-red-50 p-3 text-sm">

@@ -2,6 +2,7 @@ import { CalendarClock, Gauge, Pencil, Route as RouteIcon, ShieldCheck, Timer, T
 import type { ReactNode } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { btnPrimary, btnSecondary } from '../../components/ui/buttons'
+import { AlertList } from '../../components/alerts/AlertList'
 import { Card } from '../../components/ui/Card'
 import { ErrorState, LoadingState } from '../../components/ui/States'
 import { StatusBadge } from '../../components/ui/StatusBadge'
@@ -73,6 +74,10 @@ export function TruckDetailPanel({
           <ul className="mt-0.5 list-disc pl-4">{t.compliance.issues.map((i) => <li key={i}>{i}</li>)}</ul>
         </div>
       )}
+      <div className="mt-3">
+        <p className="mb-2 text-sm font-semibold text-ink">Active alerts</p>
+        <AlertList query={`truck_id=${t.id}`} limit={3} compact emptyTitle="No alerts for this truck" version={version} />
+      </div>
       <Link to={`/compliance?truck=${t.id}`} className="mt-3 text-sm font-semibold text-primary hover:underline">
         View compliance documents →
       </Link>

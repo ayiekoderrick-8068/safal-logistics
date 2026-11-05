@@ -158,6 +158,29 @@ test('a delay can be reported, assigned and resolved with accurate timing', asyn
   await expect(row).not.toContainText('Ongoing')
 })
 
+test('alerts surface in the bell and can be acknowledged and resolved', async ({ page }) => {
+  await signIn(page)
+  // The labelled sample dataset puts KDD 469W into maintenance, which raises a warning.
+  await expect(page.getByTestId('alert-badge')).toBeVisible()
+  await page.getByRole('button', { name: /^Alerts/ }).click()
+  await page.getByRole('link', { name: 'View all alerts' }).click()
+  await expect(page.getByRole('heading', { level: 1, name: 'Operational Alerts' })).toBeVisible()
+
+  await page.getByLabel('Filter by type').selectOption('maintenance_required')
+  const row = page.getByRole('row', { name: /KDD 469W – under maintenance/ })
+  await row.getByRole('button', { name: 'Acknowledge' }).click()
+  await expect(row).toContainText('Acknowledged')
+  await row.getByRole('button', { name: 'Resolve' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Resolve' }).click()
+  await expect(page.getByRole('dialog').getByText('Explain how this was resolved')).toBeVisible()
+  await page.getByLabel('Resolution note').fill('Workshop booked for Friday')
+  await submitDialog(page, 'Resolve')
+  await expect(page.getByText('No active alerts')).toBeVisible()
+
+  await page.getByLabel('Filter by status').selectOption('resolved')
+  await expect(page.getByRole('row', { name: /KDD 469W/ })).toContainText('Workshop booked for Friday')
+})
+
 test('double-booking a bay is rejected with a clear message', async ({ page }) => {
   await signIn(page)
   await page.goto('/loading-bays')

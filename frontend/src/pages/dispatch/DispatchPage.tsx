@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router'
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useAuth } from '../../auth/context'
+import { AlertList } from '../../components/alerts/AlertList'
 import { btnPrimary, btnSecondary, btnSmallGhost, btnSmallPrimary } from '../../components/ui/buttons'
 import { Card, CardHeader } from '../../components/ui/Card'
 import { FilterSelect } from '../../components/ui/FilterSelect'
@@ -244,25 +245,9 @@ export function DispatchPage() {
 
         <div className="order-1 grid grid-cols-1 gap-4 xl:grid-cols-2">
           <Card>
-            <CardHeader title="Dispatch Alerts" subtitle="Trucks behind ETA and late deliveries." />
-            {!o || o.alerts.length === 0 ? <EmptyState title="No delivery delays" /> : (
-              <ul className="space-y-2.5">
-                {o.alerts.map((d) => (
-                  <li key={d.id} className="flex items-start gap-3 rounded-xl border border-red-100 bg-red-50 p-3 text-sm">
-                    <TriangleAlert className="mt-0.5 size-5 shrink-0 text-red-600" aria-hidden />
-                    <div className="min-w-0">
-                      <p className="font-semibold text-ink">
-                        {d.truck.label} – {d.status === 'delivered' ? 'Delivered late' : d.is_overdue ? 'Missed ETA' : 'Delay reported'}
-                      </p>
-                      <p className="text-xs text-ink-muted">
-                        {d.route.label} · {d.delay_minutes} min{d.delay_cause ? ` · ${DELAY_CAUSE_LABELS[d.delay_cause]}` : ''}
-                      </p>
-                    </div>
-                    <StatusBadge status="delayed" />
-                  </li>
-                ))}
-              </ul>
-            )}
+            <CardHeader title="Dispatch Alerts" subtitle="Overdue deliveries, missed dispatch times and open delays." />
+            <AlertList query="types=delivery_overdue,missed_dispatch,incident_unresolved" limit={4}
+              emptyTitle="No dispatch alerts" version={version} />
           </Card>
           <Card>
             <CardHeader title="Dispatch Performance" subtitle="Deliveries completed in the last 7 days." />

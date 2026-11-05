@@ -179,6 +179,37 @@ export interface AssignableUser {
   role: Role
 }
 
+// ---------- Alerts ----------
+export type AlertSeverity = 'info' | 'warning' | 'critical'
+
+export interface OpsAlert {
+  id: number
+  alert_type: string
+  severity: AlertSeverity
+  status: 'open' | 'acknowledged' | 'resolved'
+  title: string
+  message: string
+  link: string
+  truck: Ref | null
+  first_seen_at: string
+  last_seen_at: string
+  acknowledged_at: string | null
+  acknowledged_by: string | null
+  resolved_at: string | null
+  resolved_by: string | null
+  resolution_note: string | null
+  auto_resolved: boolean
+}
+
+export interface AlertSummary {
+  critical: number
+  warning: number
+  info: number
+  acknowledged: number
+  total_active: number
+  latest: OpsAlert[]
+}
+
 export interface Eligibility {
   truck: Ref
   eligible: boolean

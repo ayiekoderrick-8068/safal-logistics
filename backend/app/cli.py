@@ -119,6 +119,15 @@ def reset_e2e(args: argparse.Namespace) -> int:
     return 0
 
 
+def refresh_alerts_cmd(_: argparse.Namespace) -> int:
+    from .services.alerts import refresh_alerts
+
+    with SessionLocal() as db:
+        stats = refresh_alerts(db, force=True)
+    print(f"Alerts refreshed: {stats}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli", description="LogiTrack management")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -136,6 +145,10 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("clear-sample", help="Delete the sample dataset")
     p.add_argument("--yes", action="store_true")
     p.set_defaults(func=clear_sample)
+
+    sub.add_parser("refresh-alerts", help="Re-evaluate operational alerts (for cron)").set_defaults(
+        func=refresh_alerts_cmd
+    )
 
     p = sub.add_parser("reset-e2e", help="Rebuild the disposable *_e2e test database")
     p.add_argument("--yes", action="store_true")

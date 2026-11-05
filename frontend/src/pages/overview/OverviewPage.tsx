@@ -15,6 +15,7 @@ import { SampleDataBanner } from '../../components/ui/SampleDataBanner'
 import { StatCard } from '../../components/ui/StatCard'
 import { EmptyState, ErrorState, LoadingState } from '../../components/ui/States'
 import { StatusBadge } from '../../components/ui/StatusBadge'
+import { AlertList } from '../../components/alerts/AlertList'
 import { useApi } from '../../hooks/useApi'
 import {
   describeChange,
@@ -195,36 +196,11 @@ function OverviewContent({ data, stale }: { data: DashboardOverview; stale: bool
           </Card>
           <Card>
             <CardHeader
-              title="Compliance Alerts"
-              subtitle="Documents expired or expiring within 30 days."
-              action={<Link to="/compliance" className="rounded-lg border border-line px-3 py-1 text-sm font-semibold text-ink hover:bg-surface-muted">View all</Link>}
+              title="Operational Alerts"
+              subtitle="Compliance, maintenance, loading, delivery and delay alerts — most severe first."
+              action={<Link to="/alerts" className="rounded-lg border border-line px-3 py-1 text-sm font-semibold text-ink hover:bg-surface-muted">View all</Link>}
             />
-            {data.expiry_alerts.length === 0 ? (
-              <EmptyState title="No upcoming expiries" />
-            ) : (
-              <ul className="divide-y divide-line">
-                {data.expiry_alerts.map((a) => (
-                  <li key={`${a.truck_registration}-${a.doc_type}`} className="flex items-center gap-3 py-2.5 text-sm">
-                    <CalendarDays className="size-4.5 shrink-0 text-primary" aria-hidden />
-                    <span className="font-semibold text-ink">
-                      {a.truck_registration} <span className="font-normal">– {humanize(a.doc_type)}</span>
-                    </span>
-                    <span className="ml-auto text-ink-muted">{formatDate(a.expires_on)}</span>
-                    <span
-                      className={
-                        a.days_remaining < 0
-                          ? 'w-24 rounded-lg bg-red-100 px-2 py-0.5 text-center text-xs font-semibold text-red-700'
-                          : 'w-24 rounded-lg bg-amber-100 px-2 py-0.5 text-center text-xs font-semibold text-amber-800'
-                      }
-                    >
-                      {a.days_remaining < 0
-                        ? `Overdue ${-a.days_remaining}d`
-                        : a.days_remaining === 0 ? 'Today' : `${a.days_remaining} days`}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <AlertList limit={5} compact emptyTitle="No active alerts" />
           </Card>
         </div>
       </div>

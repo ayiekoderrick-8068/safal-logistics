@@ -1,6 +1,7 @@
 import clsx from 'clsx'
 import { CircleCheck, Plus, Search, ShieldAlert, Truck, UserPlus, Wrench } from 'lucide-react'
 import { useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { useAuth } from '../../auth/context'
 import { btnPrimary, btnSecondary } from '../../components/ui/buttons'
 import { Card, CardHeader } from '../../components/ui/Card'
@@ -47,7 +48,8 @@ export function FleetPage() {
   const [query, setQuery] = useState('')
   const [status, setStatus] = useState('')
   const [offset, setOffset] = useState(0)
-  const [selected, setSelected] = useState<number | null>(null)
+  const [searchParams] = useSearchParams()
+  const [selected, setSelected] = useState<number | null>(Number(searchParams.get('truck')) || null)
   const [dialog, setDialog] = useState<Dialog>(null)
   const [version, setVersion] = useState(0)
   const q = useDebounced(query.trim())
