@@ -4,9 +4,10 @@ LogiTrack is a logistics management platform for fleet, loading-bay scheduling, 
 turnaround-time analytics and vehicle compliance. It was built as a portfolio project inspired
 by the Graduate Logistics Systems Analyst role at Safal.
 
-> **Status: Milestones 1–3 complete** (operations dashboard, the truck-to-delivery workflow,
-> compliance management, delay incidents, operational alerts, turnaround analytics). See
-> [Project status](#project-status) for exactly what works, what is sample data, and what remains.
+> **Status: Milestones 1–4 complete** (operations dashboard, the truck-to-delivery workflow,
+> compliance management, delay incidents, operational alerts, turnaround analytics, and
+> operational reporting with CSV and PDF exports). See [Project status](#project-status) for
+> exactly what works, what is sample data, and what remains.
 
 ## Tech stack
 
@@ -37,10 +38,11 @@ docker-compose.yml     local PostgreSQL (dev + test databases)
 
 `users`, `drivers`, `trucks`, `routes`, `loading_bays`, `loading_schedules`, `dispatches`,
 `delay_incidents`, `compliance_documents`, `compliance_requirements`, `alerts`,
-`audit_events`, `app_settings`.
+`report_runs`, `audit_events`, `app_settings`.
 
-Migrations: `c9ec15ec26f6` (initial schema) and `4cdcd62eb0a9` (compliance history, file
-metadata and requirements; delay assignment and resolution; alerts). The second migration
+Migrations: `c9ec15ec26f6` (initial schema), `4cdcd62eb0a9` (compliance history, file
+metadata and requirements; delay assignment and resolution; alerts) and `0763fe6a7716`
+(report history). The second migration
 keeps existing records: it marks older duplicate documents as history and fixes incident
 status and resolution times before adding the new constraints. It has been verified with a
 downgrade → upgrade round trip.
@@ -246,7 +248,115 @@ Every write is checked on the server; the UI only hides buttons as a convenience
 
 Full interactive documentation: http://localhost:8090/docs.
 
+## Operational reporting (Milestone 4)
+
+Open **Reports** in the sidebar. A single set of filters drives every KPI, chart, table and
+export:
+
+- **Period:** today, yesterday, last 7 days, last 30 days, or a custom range of up to 366
+  days.
+- **Combinable filters:** truck, driver, loading bay, route, dispatch status (including
+  "flagged delayed") and delay category.
+- **Shareable views:** applied filters live in the URL, so a filtered report can be
+  bookmarked or shared.
+
+### Definitions (`backend/app/services/reporting.py`)
+
+| Item | Definition |
+|------|------------|
+| Period anchors | Loads count on the local day the truck departed; dispatches on the day they were dispatched; delays on the day they started; bookings on their scheduled start. Times are Africa/Nairobi. |
+| Waiting | loading start − arrival |
+| Loading | loading finish − loading start |
+| Finish to departure | departure − loading finish |
+| Yard turnaround | departure − arrival |
+| Delivery duration | actual arrival − dispatch time. Kept separate from yard turnaround. |
+| Incomplete records | Excluded from averages. Loads still on site are reported as "ongoing". |
+| On time | Delivered at or before the deadline: expected arrival + `LOGITRACK_DELAY_GRACE_MINUTES` (default 15). In-transit deliveries are pending and excluded from on-time %. |
+| Delayed loads | Completed loads over their bay's turnaround target, or delivered late, or flagged delayed. |
+| Bay utilisation | Recorded occupancy (arrival → departure, or now if still on site, clipped to the period) ÷ (days × operating hours) × 100. Operating hours are adjustable on the Loading Bays tab (default 12). Bays with no recorded occupancy show no figure, never 0%. |
+| Compliance interruptions | Dispatch attempts blocked by missing or expired documents or by vehicle status (from the audit log). |
+| Delay totals | Each incident is counted once, even when linked to both a booking and a dispatch. "Impact" is the reported delay minutes; "resolution time" is resolved − started. |
+| Driver filter | Uses the truck's current driver (assignment history isn't recorded yet). |
+
+### Dashboard
+
+The Reports page uses the approved Reports & Export design and has six tabs:
+
+- **Overview:** trend chart, dispatch outcomes, Quick Reports (PDF), and recent report
+  activity.
+- **Turnaround:** avg, median, min and max for each duration; daily or weekly trend against
+  target; breakdown by bay, route or truck.
+- **Delays:** category bar chart and donut, trend, most affected bays, routes and vehicles,
+  recurring causes, repeat patterns, and recent incidents.
+- **Loading Bays:** loads, waiting, loading, delayed, throughput, occupied hours,
+  utilisation and peak hour per bay, plus arrivals by hour.
+- **Dispatch & Delivery:** dispatched, completed, on time, late and pending; a lateness
+  distribution; planned vs actual time by route.
+- **Records & Export:** paginated turnaround, booking, dispatch and delay records with CSV
+  and PDF export.
+
+### Exports
+
+- **CSV:** fleet inventory, loading schedules, loading turnaround records, dispatch records,
+  delay incidents, compliance summary, and the filtered operations report.
+  - Dates and times are ISO 8601 in local time (e.g. `2026-11-02T06:00:00+03:00`), units
+    are in the headings, and the applied filters are listed in the file's preamble.
+  - Text starting with `= + - @`, a tab or a carriage return is prefixed with `'` so
+    spreadsheets can't run it as a formula; real numbers are left as numbers.
+  - Phone numbers, licence numbers and file storage keys are never exported.
+- **PDF** (generated server-side with ReportLab): Executive Operations Summary, Truck
+  Turnaround Performance, Loading Bay Efficiency, Dispatch & Delivery Performance, Delay
+  Incident Analysis, and Compliance Summary. Each has a branded header, generation time,
+  applied filters, KPIs, charts and tables, definitions and "Page X of Y".
+- **Excel (XLSX):** not implemented. No spreadsheet library was installed and the brief made
+  it optional; the CSV files open directly in Excel.
+- **Report history:** every export is recorded in `report_runs` (type, format, filters,
+  status, row count, requester) and in the audit log. The generated documents themselves
+  are not stored. Users see their own activity; administrators see everyone's.
+
+### Report permissions (enforced server-side)
+
+| Role | View analytics | Operational CSV/PDF | Fleet CSV | Compliance CSV/PDF |
+|------|:-:|:-:|:-:|:-:|
+| Administrator | ✓ | ✓ | ✓ | ✓ |
+| Operations | ✓ | ✓ | ✓ | – |
+| Fleet Manager | ✓ | ✓ | ✓ | ✓ |
+| Compliance | – | – | – | ✓ |
+| Viewer | ✓ (read-only) | – | – | – |
+
+### API endpoints (Milestone 4)
+
+All accept the filter parameters `period`, `start`, `end`, `truck_id`, `driver_id`, `bay_id`,
+`route_id`, `dispatch_status` and `delay_cause`.
+
+| Method & path | Purpose |
+|---------------|---------|
+| `GET /api/reports/summary` | KPIs, daily trend, dispatch outcomes (`hours_per_day` optional) |
+| `GET /api/reports/turnaround` | Duration statistics, daily/weekly trends, by truck/route/bay |
+| `GET /api/reports/delays` | Delay analysis |
+| `GET /api/reports/bays` | Bay efficiency and peak hours (`hours_per_day` 1–24) |
+| `GET /api/reports/dispatch` | Dispatch & delivery performance |
+| `GET /api/reports/records?type=turnaround\|schedules\|dispatches\|delays` | Paginated records (`limit`, `offset`) |
+| `GET /api/reports/export/{dataset}.csv` | `operations`, `turnaround`, `schedules`, `dispatches`, `delays`, `fleet`, `compliance` |
+| `GET /api/reports/export/{report}.pdf` | `executive`, `turnaround`, `bays`, `dispatch`, `delays`, `compliance` |
+| `GET /api/reports/catalogue` · `GET /api/reports/history` | Reports allowed for the user; recent report activity |
+
 ## Project status
+
+### Working (Milestone 4)
+
+- **Reports & Export page:** filters, seven KPIs and six analysis tabs, all calculated from
+  database records.
+- **CSV and PDF exports:** seven CSV datasets and six PDF reports, with report history.
+- **Tests:**
+  - 123 backend, including 34 reporting tests built on a hand-checkable scenario. They cover
+    turnaround components, ongoing loads, the 23:30 local-time day boundary, the on-time
+    grace period, delay de-duplication, utilisation, combined filters, pagination, empty
+    data, CSV injection, all six PDFs, history and the permission matrix.
+  - 37 frontend unit/component tests.
+  - 13 end-to-end tests (9 desktop, 4 mobile). The end-to-end run includes register →
+    schedule → load → dispatch → deliver → record a delay → filter the analytics → verify
+    the figures → download CSV and PDF.
 
 ### Working (Milestone 3)
 
@@ -320,10 +430,11 @@ Full interactive documentation: http://localhost:8090/docs.
 
 | Next | Scope |
 |------|-------|
-| 4 | Reports: filtering, CSV export, PDF reports |
-| 5 | User management UI, activity log viewer, settings (targets, grace period, policies) |
+| 5 | User management UI, activity log viewer, settings (targets, grace period, operating hours, policies) |
 
 Also outstanding:
+- Excel (XLSX) export, scheduled or emailed reports, and driver-assignment history (so the
+  driver filter can be historical rather than current).
 - Login rate limiting and global record search.
 - Editing or correcting a document's reference without renewing it (documents are
   deliberately immutable for now).
