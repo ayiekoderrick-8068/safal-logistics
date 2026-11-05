@@ -101,10 +101,6 @@ export const NAV: NavSection[] = [
       {
         to: '/delays', label: 'Delay Reports', title: 'Delay Reports', icon: Timer,
         description: 'Log and investigate loading and dispatch delays.',
-        planned: {
-          milestone: 'Milestone 3',
-          features: ['Record delay incidents with cause', 'Track investigation status to resolution'],
-        },
       },
     ],
   },

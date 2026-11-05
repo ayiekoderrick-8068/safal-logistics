@@ -322,6 +322,12 @@ export function LoadingBaysPage() {
                                     <X className="size-3.5" aria-hidden />
                                   </button>
                                 )}
+                                {['scheduled', 'arrived', 'loading', 'loaded'].includes(s.status) && (
+                                  <button type="button" className={btnSmallGhost} aria-label={`Report delay for ${s.truck.label}`}
+                                    onClick={() => navigate(`/delays?report=schedule:${s.id}`)}>
+                                    <TriangleAlert className="size-3.5" aria-hidden /> Delay
+                                  </button>
+                                )}
                                 {s.load_ref && <span className="text-xs text-ink-muted">{s.load_ref}</span>}
                               </div>
                             )}

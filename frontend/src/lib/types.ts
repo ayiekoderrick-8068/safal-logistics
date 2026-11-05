@@ -36,6 +36,7 @@ export type ScheduleStatus = 'scheduled' | 'arrived' | 'loading' | 'loaded' | 'd
 export type DispatchStatus = 'pending' | 'in_transit' | 'delivered' | 'cancelled'
 export type DelayCause =
   | 'loading_congestion'
+  | 'vehicle_breakdown'
   | 'documentation'
   | 'truck_unavailability'
   | 'equipment_breakdown'
@@ -134,6 +135,48 @@ export interface ComplianceOverview {
   by_type: { doc_type: DocType; valid: number; expiring: number; expired: number; missing: number }[]
   upcoming: { document_id: number; truck: Ref; doc_type: DocType; expires_on: string; days_remaining: number; state: string }[]
   sample_data: boolean
+}
+
+// ---------- Delay incidents ----------
+export type IncidentStatus = 'open' | 'investigating' | 'in_progress' | 'resolved'
+
+export interface Incident {
+  id: number
+  source: 'loading' | 'dispatch'
+  truck: Ref | null
+  operation: string
+  load_ref: string | null
+  schedule_id: number | null
+  dispatch_id: number | null
+  cause: DelayCause
+  status: IncidentStatus
+  started_at: string
+  resolved_at: string | null
+  duration_minutes: number
+  is_ongoing: boolean
+  impact_minutes: number
+  description: string | null
+  resolution_notes: string | null
+  assigned_to: Ref | null
+  reported_by: string | null
+  created_at: string
+}
+
+export interface IncidentSummary {
+  unresolved: number
+  unassigned: number
+  resolved_7d: number
+  avg_resolution_minutes_30d: number | null
+  impact_minutes_7d: number
+  oldest_unresolved_minutes: number | null
+  by_cause_30d: { cause: DelayCause; count: number; impact_minutes: number }[]
+  sample_data: boolean
+}
+
+export interface AssignableUser {
+  id: number
+  label: string
+  role: Role
 }
 
 export interface Eligibility {

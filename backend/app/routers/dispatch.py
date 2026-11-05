@@ -222,7 +222,8 @@ def deliver(
                 cause=body.delay_cause,
                 delay_minutes=late_minutes,
                 description=body.delay_notes,
-                occurred_at=at,
+                # The delay began when the ETA was missed; it is still open for follow-up.
+                occurred_at=d.expected_arrival_at,
                 status=IncidentStatus.OPEN,
                 reported_by_id=user.id,
             )

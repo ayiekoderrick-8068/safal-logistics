@@ -43,5 +43,5 @@ select = ["E", "F", "I", "B", "UP", "S"]
 ignore = ["B008"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "S105", "S106"]
+"tests/*" = ["S101", "S105", "S106", "F811"]  # F811: shared pytest fixtures are imported
 "app/sample_data.py" = ["S311"]
