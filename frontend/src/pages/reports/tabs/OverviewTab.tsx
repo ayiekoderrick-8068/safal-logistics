@@ -90,7 +90,7 @@ export function OverviewTab({ summary, query, catalogue, history, onExported }: 
           <ul className="divide-y divide-line text-sm">
             {history.map((h) => (
               <li key={h.id} className="flex items-center gap-3 py-2">
-                <span className="w-10 rounded-md bg-surface-muted px-1.5 py-0.5 text-center text-xs font-bold text-ink uppercase">{h.format}</span>
+                <span className="w-12 rounded-md bg-surface-muted px-1.5 py-0.5 text-center text-xs font-bold text-ink uppercase">{h.format}</span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold text-ink">{h.title}</span>
                   <span className="block truncate text-xs text-ink-muted">

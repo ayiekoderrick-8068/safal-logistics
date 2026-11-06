@@ -6,7 +6,7 @@ import { ErrorState, LoadingState } from '../../../components/ui/States'
 import { StatusBadge } from '../../../components/ui/StatusBadge'
 import { useApi } from '../../../hooks/useApi'
 import { DELAY_CAUSE_LABELS, formatDateTime, formatDuration } from '../../../lib/format'
-import type { CatalogueItem, RecordsPage } from '../types'
+import type { CatalogueItem, ExportFormat, RecordsPage } from '../types'
 import { DataTable, ExportLink, type Col } from '../ui'
 
 type Kind = 'turnaround' | 'schedules' | 'dispatches' | 'delays'
@@ -66,7 +66,7 @@ export function RecordsTab({ query, catalogue, onExported }: { query: string; ca
   const [kind, setKind] = useState<Kind>('turnaround')
   const [offset, setOffset] = useState(0)
   const { data, error, refetch } = useApi<RecordsPage>(`/reports/records?${query}&type=${kind}&limit=${PAGE}&offset=${offset}`)
-  const can = (key: string, f: 'csv' | 'pdf') => !!catalogue?.find((c) => c.key === key && c.formats.includes(f))
+  const can = (key: string, f: ExportFormat) =>!!catalogue?.find((c) => c.key === key && c.formats.includes(f))
   const pdfFor: Record<Kind, string> = { turnaround: 'turnaround', schedules: 'bays', dispatches: 'dispatch', delays: 'delays' }
   return (
     <Card>
@@ -76,6 +76,7 @@ export function RecordsTab({ query, catalogue, onExported }: { query: string; ca
             <FilterSelect label="Record type" value={kind} onChange={(v) => { setKind(v as Kind); setOffset(0) }}
               options={(Object.keys(LABELS) as Kind[]).map((k) => ({ value: k, label: LABELS[k] }))} />
             {can(kind, 'csv') && <ExportLink href={`/api/reports/export/${kind}.csv?${query}`} format="csv" label="Export CSV" onClick={onExported} />}
+            {can(kind, 'xlsx') && <ExportLink href={`/api/reports/export/${kind}.xlsx?${query}`} format="xlsx" label="Export Excel" onClick={onExported} />}
             {can(pdfFor[kind], 'pdf') && <ExportLink href={`/api/reports/export/${pdfFor[kind]}.pdf?${query}`} format="pdf" label="Export PDF" onClick={onExported} />}
           </div>
         } />

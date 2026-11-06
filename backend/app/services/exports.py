@@ -1,25 +1,36 @@
-"""CSV exports built from the same report queries as the dashboard.
+"""CSV and Excel exports built from the same report queries as the dashboard.
 
-- Dates/times: ISO 8601 in the operations timezone (e.g. 2026-11-05T08:30:00+03:00).
+- Dates/times: CSV uses ISO 8601 in the operations timezone (2026-11-05T08:30:00+03:00);
+  Excel uses real date cells in local operations time (Excel has no time zones), and the
+  "Report info" sheet states the zone.
 - Units are in the column headings, e.g. "Turnaround (min)".
 - Formula injection: text cells beginning with = + - @ TAB CR are prefixed with an apostrophe
-  so spreadsheet applications treat them as text. Numbers are written as numbers.
+  so spreadsheet applications treat them as text. Numbers are written as numbers. In Excel
+  files every text value is additionally stored as a string cell (never a formula), and
+  XML-illegal control characters are removed.
 - Sensitive fields (phone numbers, licence numbers, password data, file storage keys) are
   never exported.
 """
 
 import csv
 import io
+import re
 from collections.abc import Callable, Iterable
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
+from openpyxl import Workbook
+from openpyxl.cell import WriteOnlyCell
+from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from ..config import get_settings
 from ..models import ComplianceDocument, Truck
+from .app_settings import is_sample_data
 from .compliance import DOC_LABELS, evaluate_trucks
 from .operations import local_today, trucks_out
 from .reporting import (
@@ -268,15 +279,131 @@ def compliance_rows(db: Session, trucks: list[Truck]) -> list[dict[str, Any]]:
     return out
 
 
-def export_csv(db: Session, f: ReportFilters, dataset: str) -> tuple[str, int]:
-    columns, recs = dataset_rows(db, f, dataset)
+def export_preamble(db: Session, f: ReportFilters, dataset: str) -> list[tuple[str, str]]:
+    """Title, generation time, data source and applied filters - shared by CSV and Excel."""
     preamble = [
         ("LogiTrack report", DATASETS[dataset]),
         ("Generated", datetime.now(get_settings().tz).isoformat(timespec="seconds")),
     ]
+    if is_sample_data(db):
+        preamble.append(("Data source", "SAMPLE demonstration data - not live operations"))
     if dataset in ("fleet", "compliance"):
         preamble += [(k, v) for k, v in describe_filters(db, f) if k in ("Truck", "Driver")]
         preamble.append(("Note", "Current snapshot (not limited to the reporting period)"))
     else:
         preamble += describe_filters(db, f)
-    return write_csv(columns, recs, preamble)
+    return preamble
+
+
+def export_csv(db: Session, f: ReportFilters, dataset: str) -> tuple[str, int]:
+    columns, recs = dataset_rows(db, f, dataset)
+    return write_csv(columns, recs, export_preamble(db, f, dataset))
+
+
+# ---------------------------------------------------------------- Excel (.xlsx)
+XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+_HEADER_FILL = PatternFill("solid", start_color="0E5A6B")  # LogiTrack teal
+_HEADER_FONT = Font(bold=True, color="FFFFFF")
+_LABEL_FONT = Font(bold=True, color="0E5A6B")
+_DATETIME_FMT = "yyyy-mm-dd hh:mm"
+_DATE_FMT = "yyyy-mm-dd"
+_MAX_CELL = 32_767  # Excel's limit for one cell
+
+
+def xlsx_text(value: Any) -> str:
+    """Text for an Excel cell: formula-safe, free of XML-illegal control characters."""
+    text = safe_cell(value)
+    text = text if isinstance(text, str) else str(text)
+    return ILLEGAL_CHARACTERS_RE.sub("", text)[:_MAX_CELL]
+
+
+def _xlsx_cell(ws: Any, value: Any) -> WriteOnlyCell:
+    """Typed cell: numbers stay numeric, dates become real Excel dates (local time),
+    and every string is stored as an inline string - never as a formula."""
+    if value is None:
+        return WriteOnlyCell(ws, value=None)
+    if isinstance(value, bool):
+        cell = WriteOnlyCell(ws, value="yes" if value else "no")
+    elif isinstance(value, datetime):
+        local = value.astimezone(get_settings().tz).replace(tzinfo=None)
+        cell = WriteOnlyCell(ws, value=local)
+        cell.number_format = _DATETIME_FMT
+        return cell
+    elif isinstance(value, date):
+        cell = WriteOnlyCell(ws, value=value)
+        cell.number_format = _DATE_FMT
+        return cell
+    elif isinstance(value, (int, float, Decimal)):
+        cell = WriteOnlyCell(ws, value=float(value) if isinstance(value, Decimal) else value)
+        cell.number_format = "0" if isinstance(value, int) else "0.0"
+        return cell
+    else:
+        cell = WriteOnlyCell(ws, value=xlsx_text(value))
+    cell.data_type = "s"  # force text even when it begins with "=" (openpyxl infers formulas)
+    return cell
+
+
+def _width(value: Any) -> int:
+    if value is None:
+        return 0
+    if isinstance(value, datetime):
+        return 16
+    if isinstance(value, date):
+        return 10
+    return min(len(str(value)), 60)
+
+
+def write_xlsx(
+    columns: list[Column],
+    records: list[dict[str, Any]],
+    preamble: list[tuple[str, str]],
+    sheet_title: str,
+) -> bytes:
+    wb = Workbook(write_only=True)
+    wb.properties.creator = "LogiTrack"
+    wb.properties.title = sheet_title
+
+    data = wb.create_sheet(re.sub(r"[\[\]:*?/\\]", " ", sheet_title)[:31])
+    values = [[fn(r) for _, fn in columns] for r in records]
+    for i, (heading, _) in enumerate(columns):
+        widest = max([len(heading)] + [_width(row[i]) for row in values[:2000]])
+        data.column_dimensions[get_column_letter(i + 1)].width = widest + 2
+    data.freeze_panes = "A2"
+    if columns:
+        last = get_column_letter(len(columns))
+        data.auto_filter.ref = f"A1:{last}{max(len(values) + 1, 2)}"
+
+    header = []
+    for heading, _ in columns:
+        c = WriteOnlyCell(data, value=xlsx_text(heading))
+        c.data_type, c.font, c.fill = "s", _HEADER_FONT, _HEADER_FILL
+        c.alignment = Alignment(vertical="center", wrap_text=True)
+        header.append(c)
+    data.append(header)
+    for row in values:
+        data.append([_xlsx_cell(data, v) for v in row])
+
+    info = wb.create_sheet("Report info")
+    info.column_dimensions["A"].width = 22
+    info.column_dimensions["B"].width = 70
+    rows_info = [
+        *preamble,
+        ("Rows", str(len(values))),
+        ("Times", f"Local time ({get_settings().timezone}); durations in minutes"),
+    ]
+    for label, value in rows_info:
+        a = WriteOnlyCell(info, value=xlsx_text(label))
+        a.data_type, a.font = "s", _LABEL_FONT
+        b = WriteOnlyCell(info, value=xlsx_text(value))
+        b.data_type = "s"
+        info.append([a, b])
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def export_xlsx(db: Session, f: ReportFilters, dataset: str) -> tuple[bytes, int]:
+    columns, recs = dataset_rows(db, f, dataset)
+    content = write_xlsx(columns, recs, export_preamble(db, f, dataset), DATASETS[dataset])
+    return content, len(recs)

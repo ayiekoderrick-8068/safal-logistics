@@ -133,13 +133,15 @@ export interface DispatchPerf extends Applied {
   }[]
 }
 
-export interface CatalogueItem { key: string; title: string; formats: ('pdf' | 'csv')[] }
+export type ExportFormat = 'pdf' | 'csv' | 'xlsx'
+
+export interface CatalogueItem { key: string; title: string; formats: ExportFormat[] }
 
 export interface ReportRun {
   id: number
   report_type: string
   title: string
-  format: 'csv' | 'pdf'
+  format: ExportFormat
   status: 'success' | 'failed'
   filters: Record<string, string | null>
   row_count: number | null

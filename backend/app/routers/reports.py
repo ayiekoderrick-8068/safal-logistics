@@ -1,4 +1,6 @@
-"""Reporting API: analytics, paginated records, CSV / PDF exports and report history.
+"""Reporting API: analytics, paginated records, CSV / Excel / PDF exports and report history.
+
+Excel exports share the CSV datasets, filters and access rules exactly.
 
 Access (enforced here, server-side):
   operational analytics (summary, turnaround, delays, bays, dispatch, records)
@@ -23,7 +25,7 @@ from ..db import get_db
 from ..deps import get_current_user
 from ..models import DelayCause, ReportRun, Role, User
 from ..services import reporting as rpt
-from ..services.exports import DATASETS, export_csv
+from ..services.exports import DATASETS, XLSX_MEDIA_TYPE, export_csv, export_xlsx
 from ..services.operations import local_today
 from ..services.pdf_reports import REPORTS, build_pdf
 
@@ -169,13 +171,14 @@ def catalogue(user: Annotated[User, Depends(get_current_user)]) -> list[Catalogu
     def ok(roles: set[Role]) -> bool:
         return user.role == Role.ADMIN or user.role in roles
 
+    tabular = ["csv", "xlsx"]  # same rows and permissions
     items = [
-        CatalogueItem(key=k, title=t, formats=["pdf"] + (["csv"] if k in CSV_ACCESS else []))
+        CatalogueItem(key=k, title=t, formats=["pdf"] + (tabular if k in CSV_ACCESS else []))
         for k, t in REPORTS.items()
         if ok(PDF_ACCESS[k])
     ]
     items += [
-        CatalogueItem(key=k, title=t, formats=["csv"])
+        CatalogueItem(key=k, title=t, formats=tabular)
         for k, t in DATASETS.items()
         if k not in REPORTS and ok(CSV_ACCESS[k])
     ]
@@ -284,6 +287,36 @@ def export_csv_endpoint(
         media_type="text/csv; charset=utf-8",
         headers={
             "Content-Disposition": f'attachment; filename="{_filename(dataset, f, "csv")}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.get("/export/{dataset}.xlsx")
+def export_xlsx_endpoint(
+    dataset: str,
+    f: Filters,
+    request: Request,
+    db: DB,
+    user: Annotated[User, Depends(get_current_user)],
+) -> Response:
+    """Excel workbook of the same rows, filters and permissions as the CSV export."""
+    if dataset not in DATASETS:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown export")
+    _allow(user, CSV_ACCESS[dataset])
+    try:
+        content, n = export_xlsx(db, f, dataset)
+    except Exception as exc:
+        db.rollback()
+        _record_run(db, request, user, dataset, "xlsx", f, ok=False, error=type(exc).__name__)
+        raise
+    _record_run(db, request, user, dataset, "xlsx", f, ok=True, rows=n)
+    return Response(
+        content,
+        media_type=XLSX_MEDIA_TYPE,
+        headers={
+            "Content-Disposition": f'attachment; filename="{_filename(dataset, f, "xlsx")}"',
             "Cache-Control": "no-store",
             "X-Content-Type-Options": "nosniff",
         },

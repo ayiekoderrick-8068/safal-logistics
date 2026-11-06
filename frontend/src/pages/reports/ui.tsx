@@ -1,6 +1,7 @@
 import clsx from 'clsx'
-import { Download, FileText } from 'lucide-react'
+import { Download, FileSpreadsheet, FileText } from 'lucide-react'
 import type { ReactNode } from 'react'
+import type { ExportFormat } from './types'
 
 export interface Col<T> {
   header: string
@@ -41,17 +42,22 @@ export function DataTable<T>({ cols, rows, empty, caption, minWidth = 640 }: {
 }
 
 /** Download link for a server-generated export (session cookie is sent automatically). */
+const EXPORT_STYLE: Record<ExportFormat, { icon: typeof Download; className: string }> = {
+  pdf: { icon: FileText, className: 'border-red-100 text-red-700 hover:bg-red-50' },
+  csv: { icon: Download, className: 'border-emerald-100 text-emerald-700 hover:bg-emerald-50' },
+  xlsx: { icon: FileSpreadsheet, className: 'border-cyan-100 text-cyan-800 hover:bg-cyan-50' },
+}
+
 export function ExportLink({ href, format, label, onClick }: {
   href: string
-  format: 'csv' | 'pdf'
+  format: ExportFormat
   label: string
   onClick?: () => void
 }) {
-  const Icon = format === 'pdf' ? FileText : Download
+  const { icon: Icon, className } = EXPORT_STYLE[format]
   return (
     <a href={href} download onClick={onClick}
-      className={clsx('inline-flex h-10 items-center gap-2 rounded-xl border px-3.5 text-sm font-semibold shadow-sm',
-        format === 'pdf' ? 'border-red-100 bg-white text-red-700 hover:bg-red-50' : 'border-emerald-100 bg-white text-emerald-700 hover:bg-emerald-50')}>
+      className={clsx('inline-flex h-10 items-center gap-2 rounded-xl border bg-white px-3.5 text-sm font-semibold shadow-sm', className)}>
       <Icon className="size-4" aria-hidden /> {label}
     </a>
   )

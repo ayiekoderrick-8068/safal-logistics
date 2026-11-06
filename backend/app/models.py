@@ -552,7 +552,7 @@ class ReportRun(Base):
 
     __tablename__ = "report_runs"
     __table_args__ = (
-        CheckConstraint("format IN ('csv', 'pdf')", name="format_valid"),
+        CheckConstraint("format IN ('csv', 'pdf', 'xlsx')", name="format_valid"),
         CheckConstraint("status IN ('success', 'failed')", name="status_valid"),
         CheckConstraint("row_count IS NULL OR row_count >= 0", name="row_count_non_negative"),
     )

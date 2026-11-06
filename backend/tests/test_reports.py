@@ -459,6 +459,10 @@ def test_report_permissions(
     assert client.get("/api/reports/export/dispatches.csv").status_code == ops_csv
     assert client.get("/api/reports/export/delays.pdf").status_code == ops_pdf
     assert client.get("/api/reports/export/fleet.csv").status_code == fleet_csv
+    # Excel follows the CSV rules exactly.
+    assert client.get("/api/reports/export/dispatches.xlsx").status_code == ops_csv
+    assert client.get("/api/reports/export/fleet.xlsx").status_code == fleet_csv
+    assert client.get("/api/reports/export/compliance.xlsx").status_code == compliance_pdf
     assert client.get("/api/reports/export/compliance.pdf").status_code == compliance_pdf
     keys = {c["key"] for c in client.get("/api/reports/catalogue").json()}
     assert ("compliance" in keys) == (compliance_pdf == 200)
@@ -468,3 +472,4 @@ def test_report_permissions(
 def test_reports_require_login(client) -> None:
     assert client.get("/api/reports/summary").status_code == 401
     assert client.get("/api/reports/export/fleet.csv").status_code == 401
+    assert client.get("/api/reports/export/fleet.xlsx").status_code == 401

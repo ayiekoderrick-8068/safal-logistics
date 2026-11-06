@@ -116,11 +116,27 @@ describe('ReportsPage', () => {
   it('compliance-only roles see just their permitted exports', async () => {
     vi.stubGlobal('fetch', routeFetch({
       '/api/reports/summary': () => json({ detail: 'Your role does not have access to this report' }, 403),
-      '/api/reports/catalogue': () => json([{ key: 'compliance', title: 'Compliance Summary', formats: ['pdf', 'csv'] }]),
+      '/api/reports/catalogue': () => json([{ key: 'compliance', title: 'Compliance Summary', formats: ['pdf', 'csv', 'xlsx'] }]),
     }))
     renderPage()
     expect(await screen.findByText('Reports available to your role')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'PDF' })).toHaveAttribute('href', '/api/reports/export/compliance.pdf?period=last_7_days')
+    expect(screen.getByRole('link', { name: 'Excel' })).toHaveAttribute('href', '/api/reports/export/compliance.xlsx?period=last_7_days')
+    expect(screen.getByRole('link', { name: 'CSV' })).toHaveAttribute('href', '/api/reports/export/compliance.csv?period=last_7_days')
     expect(screen.queryByRole('button', { name: 'Apply Filters' })).not.toBeInTheDocument()
+  })
+
+  it('offers Excel next to CSV on the records tab only when the catalogue allows it', async () => {
+    vi.stubGlobal('fetch', routeFetch({
+      '/api/reports/catalogue': () => json([{ key: 'turnaround', title: 'Truck Turnaround Performance', formats: ['pdf', 'csv', 'xlsx'] }]),
+      '/api/reports/records': () => json({ type: 'turnaround', total: 0, limit: 20, offset: 0, items: [] }),
+    }))
+    renderPage('/reports?period=today&truck_id=7')
+    await screen.findByRole('article', { name: 'Loads Processed' })
+    await userEvent.click(screen.getByRole('tab', { name: 'Records & Export' }))
+    expect(await screen.findByRole('link', { name: 'Export Excel' }))
+      .toHaveAttribute('href', '/api/reports/export/turnaround.xlsx?period=today&truck_id=7')
+    expect(screen.getByRole('link', { name: 'Export CSV' }))
+      .toHaveAttribute('href', '/api/reports/export/turnaround.csv?period=today&truck_id=7')
   })
 })

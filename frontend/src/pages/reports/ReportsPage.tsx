@@ -121,6 +121,7 @@ function RestrictedView({ catalogue, query, onExported }: { catalogue: Catalogue
               <span className="flex-1 font-semibold text-ink">{c.title}</span>
               {c.formats.includes('pdf') && <ExportLink href={`/api/reports/export/${c.key}.pdf?${query}`} format="pdf" label="PDF" onClick={onExported} />}
               {c.formats.includes('csv') && <ExportLink href={`/api/reports/export/${c.key}.csv?${query}`} format="csv" label="CSV" onClick={onExported} />}
+              {c.formats.includes('xlsx') && <ExportLink href={`/api/reports/export/${c.key}.xlsx?${query}`} format="xlsx" label="Excel" onClick={onExported} />}
             </li>
           ))}
         </ul>
