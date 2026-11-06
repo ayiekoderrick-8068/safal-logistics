@@ -5,7 +5,10 @@ r"""Management commands.
     uv run python -m app.cli load-sample
     uv run python -m app.cli clear-sample --yes
 
+    uv run python -m app.cli set-password --username derrick
+
 create-admin reads the password from LOGITRACK_ADMIN_PASSWORD or prompts for it.
+set-password reads it from LOGITRACK_NEW_PASSWORD or prompts twice (no echo).
 """
 
 import argparse
@@ -148,6 +151,55 @@ def unlock_login(args: argparse.Namespace) -> int:
     return 0
 
 
+def _read_new_password() -> str | None:
+    """New password from LOGITRACK_NEW_PASSWORD, or typed twice without echo."""
+    if env := os.environ.get("LOGITRACK_NEW_PASSWORD"):
+        return env
+    first = getpass.getpass("New password: ")
+    if getpass.getpass("Repeat new password: ") != first:
+        print("Passwords do not match.", file=sys.stderr)
+        return None
+    return first
+
+
+def set_password(args: argparse.Namespace) -> int:
+    from .services.throttle import unlock
+
+    with SessionLocal() as db:
+        ident = args.username.lower()
+        user = db.scalar(
+            select(User).where(
+                or_(func.lower(User.username) == ident, func.lower(User.email) == ident)
+            )
+        )
+        if user is None:
+            print("No user with that username or email.", file=sys.stderr)
+            return 1
+        password = _read_new_password()
+        if password is None:
+            return 2
+        if error := validate_password(password):
+            print(error, file=sys.stderr)
+            return 2
+        user.password_hash = hash_password(password)
+        record_event(
+            db,
+            action="user.password_reset",
+            entity_type="user",
+            entity_id=user.id,
+            summary=f"Password for {user.username} reset via CLI",
+        )
+        db.commit()
+        # A forgotten password often follows failed attempts: clear this account's lockout
+        # (sign-in counters are keyed by whatever was typed, so clear username and email).
+        for typed in {user.username, user.email}:
+            unlock(db, identifier=typed)
+    print(
+        f"Password updated for '{user.username}'. Existing sessions stay valid until they expire."
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m app.cli", description="LogiTrack management")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -174,6 +226,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--username", help="Username or email that is locked out")
     p.add_argument("--ip", help="Client IP address that is locked out")
     p.set_defaults(func=unlock_login)
+
+    p = sub.add_parser("set-password", help="Set a new password for an existing user")
+    p.add_argument("--username", required=True, help="Username or email")
+    p.set_defaults(func=set_password)
 
     p = sub.add_parser("reset-e2e", help="Rebuild the disposable *_e2e test database")
     p.add_argument("--yes", action="store_true")
