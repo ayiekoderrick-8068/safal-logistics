@@ -30,6 +30,9 @@ const UsersPage = lazy(() => import('./pages/users/UsersPage').then((m) => ({ de
 const ComplianceRecordsPage = lazy(() =>
   import('./pages/compliance/ComplianceRecordsPage').then((m) => ({ default: m.ComplianceRecordsPage })),
 )
+const EquipmentPage = lazy(() =>
+  import('./pages/maintenance/equipment/EquipmentPage').then((m) => ({ default: m.EquipmentPage })),
+)
 
 function Lazy({ children }: { children: ReactNode }) {
   return <Suspense fallback={<LoadingState label="Loading…" />}>{children}</Suspense>
@@ -63,6 +66,7 @@ export function AppRoutes() {
           </RequireAuth>
         }
       >
+        <Route path="equipment" element={<Lazy><EquipmentPage /></Lazy>} />
         {ALL_MAINTENANCE_ITEMS.filter((i) => i.planned).map((item) =>
           item.to === '/maintenance' ? (
             <Route key={item.to} index element={<ModuleRoute item={item} />} />

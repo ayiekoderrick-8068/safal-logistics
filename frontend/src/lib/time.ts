@@ -45,6 +45,11 @@ export function toZonedInput(date: Date, timeZone = APP_TIMEZONE): string {
   return `${p.year}-${pad(p.month)}-${pad(p.day)}T${pad(p.hour)}:${pad(p.minute)}`
 }
 
+/** Today's date ("YYYY-MM-DD") in the operations timezone, matching the server's local_today(). */
+export function todayIso(timeZone = APP_TIMEZONE): string {
+  return toZonedInput(new Date(), timeZone).slice(0, 10)
+}
+
 /** "YYYY-MM-DDTHH:mm" in the timezone -> ISO-8601 UTC string. */
 export function zonedInputToIso(value: string, timeZone = APP_TIMEZONE): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value)

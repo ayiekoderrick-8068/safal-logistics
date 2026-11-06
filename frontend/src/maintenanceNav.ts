@@ -30,10 +30,6 @@ export const MAINTENANCE_NAV: NavSection[] = [
       {
         to: '/maintenance/equipment', label: 'Equipment', title: 'Equipment Register', icon: Wrench,
         description: 'Register, locate and track every maintained asset.',
-        planned: {
-          milestone: 'Milestone 2',
-          features: ['Add, edit, search and archive equipment', 'Equipment details and maintenance history'],
-        },
       },
       {
         to: '/maintenance/preventive', label: 'Preventive Maintenance', title: 'Preventive Maintenance',

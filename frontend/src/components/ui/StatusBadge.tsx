@@ -17,8 +17,8 @@ const DOT_CLASSES: Record<Tone, string> = {
   slate: 'bg-slate-400',
 }
 
-export function StatusBadge({ status, label }: { status: string; label?: string }) {
-  const tone = statusTone(status)
+export function StatusBadge({ status, label, tone: toneOverride }: { status: string; label?: string; tone?: Tone }) {
+  const tone = toneOverride ?? statusTone(status)
   return (
     <span
       className={clsx(

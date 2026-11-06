@@ -58,6 +58,11 @@ const STATUS_TONES: Record<string, Tone> = {
   delayed: 'red',
   overdue: 'red',
   deactivated: 'red',
+  // Maintenance: equipment status and service schedule state
+  operational: 'green',
+  under_maintenance: 'amber',
+  due_soon: 'amber',
+  not_scheduled: 'slate',
 }
 
 /** Badge tone for a status value (unknown statuses fall back to neutral slate). */

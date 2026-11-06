@@ -646,3 +646,7 @@ class AppSetting(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+
+# Maintenance Operations tables live in their own module; importing it registers them.
+from . import models_maintenance  # noqa: E402, F401

@@ -8,7 +8,7 @@ design; it is updated as each milestone lands.
 | Milestone | Scope | Status |
 |-----------|-------|--------|
 | 1 — Foundation | Workspace chooser, maintenance sign-in, workspace-bound sessions, password re-authentication, maintenance roles | Done |
-| 2 — Equipment | Equipment register, details, maintenance history | Planned |
+| 2 — Equipment | Equipment register, details, maintenance history | Done |
 | 3 — Scheduling | Preventive-maintenance plans, recurring tasks, overdue flags | Planned |
 | 4 — Work orders | Work-order lifecycle, breakdown tracking, repair records | Planned |
 | 5 — Spare parts | Inventory, consumption, reorder alerts | Planned |
@@ -64,7 +64,37 @@ not reveal whether an account exists) and no session is issued.
 The API checks these with `require_maintenance(<permission>)`; `GET /api/maintenance/access`
 returns the caller's effective role and permissions so the UI only offers allowed actions.
 
-## Migration
+## Equipment register (Milestone 2)
+
+Tables `equipment` and `equipment_events` (`backend/app/models_maintenance.py`).
+
+* **Equipment ID** (`code`) is unique, upper-case, 2–30 letters/digits/dashes (e.g. `CNV-001`)
+  and cannot be changed after registration. Serial numbers, when given, are unique.
+* Categories: conveyor, motor, compressor, hydraulic system, pump, production machine,
+  generator, electrical, other. Status: operational, under maintenance, out of service.
+* Server-side validation: installation and last-service dates cannot be in the future; the
+  last service cannot precede installation; the next service cannot precede the last. The two
+  date-order rules are also database CHECK constraints.
+* The assigned technician must be an active user with a technician, planner or manager
+  maintenance role (or an administrator).
+* **Service state** is derived, never stored: `overdue` (next service date has passed),
+  `due_soon` (within 14 days), `scheduled`, or `not_scheduled`. Dates use the configured
+  operations timezone. Until preventive-maintenance plans exist (Milestone 3) the next service
+  date is entered by hand.
+* **Archiving** requires a reason, removes the asset from the active register and counts, and
+  blocks edits; the record and its history are kept and it can be restored.
+* **Maintenance history**: every registration, edit (with before/after values), status change,
+  technician assignment, archive and restore is appended to `equipment_events` and to the
+  audit log. Later modules add servicing, work orders and breakdowns to the same timeline.
+
+API (`/api/maintenance/equipment`, maintenance session required): `GET` list (search, category,
+status, facility, service-state and archived filters, paginated), `GET /summary`,
+`GET /options`, `GET /{id}` (with history), `POST`, `PATCH /{id}`, `POST /{id}/archive`,
+`POST /{id}/restore`. Writes need `equipment.manage`.
+
+## Migrations
+
+`c4e8a1d2f3b5` creates the two equipment tables (new tables only).
 
 `b7d2e4f1a9c0` adds the nullable `users.maintenance_role` column with a CHECK constraint. It is
 additive: existing users and records are untouched, and every existing user keeps logistics
