@@ -15,27 +15,17 @@ import argparse
 import getpass
 import os
 import sys
+from datetime import UTC, datetime
 
 from email_validator import EmailNotValidError, validate_email
 from sqlalchemy import func, or_, select
 
 from .audit import record_event
 from .db import SessionLocal
+from .deps import revoke_sessions
 from .models import Role, User, UserStatus
 from .sample_data import clear_sample_data, load_sample_data
-from .security import MAX_PASSWORD_BYTES, hash_password
-
-
-def validate_password(password: str) -> str | None:
-    if len(password) < 8:
-        return "Password must be at least 8 characters."
-    if len(password.encode()) > MAX_PASSWORD_BYTES:
-        return f"Password must be at most {MAX_PASSWORD_BYTES} bytes."
-    if not any(c.isdigit() for c in password) or not any(c.isalpha() for c in password):
-        return "Password must contain letters and numbers."
-    if all(c.isalnum() for c in password):
-        return "Password must contain at least one symbol."
-    return None
+from .security import hash_password, validate_password
 
 
 def create_admin(args: argparse.Namespace) -> int:
@@ -182,6 +172,9 @@ def set_password(args: argparse.Namespace) -> int:
             print(error, file=sys.stderr)
             return 2
         user.password_hash = hash_password(password)
+        user.password_changed_at = datetime.now(UTC)
+        user.must_change_password = False
+        revoke_sessions(user)  # anyone holding the old password's sessions is signed out
         record_event(
             db,
             action="user.password_reset",
@@ -194,9 +187,7 @@ def set_password(args: argparse.Namespace) -> int:
         # (sign-in counters are keyed by whatever was typed, so clear username and email).
         for typed in {user.username, user.email}:
             unlock(db, identifier=typed)
-    print(
-        f"Password updated for '{user.username}'. Existing sessions stay valid until they expire."
-    )
+    print(f"Password updated for '{user.username}'. Existing sessions have been signed out.")
     return 0
 
 

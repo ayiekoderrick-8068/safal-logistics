@@ -1,6 +1,7 @@
 from datetime import date, datetime
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from .models import DispatchStatus, DocumentType, Role, UserStatus
 
@@ -23,11 +24,54 @@ class UserOut(ORMModel):
     role: Role
     status: UserStatus
     last_login_at: datetime | None
+    must_change_password: bool = False
 
 
 class LoginResponse(BaseModel):
     user: UserOut
     expires_in_seconds: int
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=128)
+    new_password: str = Field(min_length=1, max_length=128)
+
+
+# ---------- User management (administrators) ----------
+_USERNAME = r"^[a-z0-9][a-z0-9._-]{2,49}$"
+
+
+class AdminUserOut(UserOut):
+    created_at: datetime
+    password_changed_at: datetime | None
+
+
+class UserCreate(BaseModel):
+    username: str = Field(pattern=_USERNAME, description="3-50 chars: a-z 0-9 . _ -")
+    email: str = Field(min_length=3, max_length=255)
+    full_name: str = Field(min_length=2, max_length=120)
+    role: Role
+    temporary_password: str = Field(min_length=1, max_length=128)
+
+    @field_validator("username", mode="before")
+    @classmethod
+    def _lower(cls, v: str) -> str:
+        return str(v).strip().lower()
+
+    @field_validator("full_name", mode="before")
+    @classmethod
+    def _clean(cls, v: str) -> str:
+        return " ".join(str(v).split())
+
+
+class UserUpdate(BaseModel):
+    full_name: str | None = Field(default=None, min_length=2, max_length=120)
+    role: Role | None = None
+    status: Literal["active", "deactivated"] | None = None
+
+
+class PasswordReset(BaseModel):
+    temporary_password: str = Field(min_length=1, max_length=128)
 
 
 # ---------- Meta / health ----------

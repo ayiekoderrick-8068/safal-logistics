@@ -30,12 +30,20 @@ def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     try:
         payload = decode_access_token(token)
         user_id = int(payload["sub"])
-    except jwt.PyJWTError, KeyError, ValueError:
+        token_version = int(payload.get("tv", 0))
+    except jwt.PyJWTError, KeyError, ValueError, TypeError:
         raise _UNAUTHENTICATED from None
     user = db.get(User, user_id)
     if user is None or user.status != UserStatus.ACTIVE:
         raise _UNAUTHENTICATED
+    if token_version != user.token_version:  # signed out, password changed or access revoked
+        raise _UNAUTHENTICATED
     return user
+
+
+def revoke_sessions(user: User) -> None:
+    """Invalidate every token issued to this user (takes effect on their next request)."""
+    user.token_version = (user.token_version or 0) + 1
 
 
 def require_roles(*roles: Role) -> Callable[..., User]:

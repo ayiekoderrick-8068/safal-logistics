@@ -146,6 +146,7 @@ class TimestampMixin:
 
 class User(TimestampMixin, Base):
     __tablename__ = "users"
+    __table_args__ = (CheckConstraint("token_version >= 0", name="token_version_non_negative"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(255), unique=True)
@@ -157,6 +158,14 @@ class User(TimestampMixin, Base):
         _enum(UserStatus, "user_status"), default=UserStatus.PENDING, index=True
     )
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Incremented to revoke every session of this user (logout, password change or reset,
+    # deactivation, role change). Tokens carry the version they were issued with.
+    token_version: Mapped[int] = mapped_column(Integer, default=0, server_default=text("0"))
+    # Set when an administrator issues a temporary password; cleared when the user changes it.
+    must_change_password: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false")
+    )
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Driver(TimestampMixin, Base):

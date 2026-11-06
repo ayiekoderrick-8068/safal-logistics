@@ -11,6 +11,19 @@ SESSION_COOKIE = "logitrack_session"
 MAX_PASSWORD_BYTES = 72
 
 
+def validate_password(password: str) -> str | None:
+    """Password policy shared by the CLI, self-service change and administrator resets."""
+    if len(password) < 8:
+        return "Password must be at least 8 characters."
+    if len(password.encode()) > MAX_PASSWORD_BYTES:
+        return f"Password must be at most {MAX_PASSWORD_BYTES} bytes."
+    if not any(c.isdigit() for c in password) or not any(c.isalpha() for c in password):
+        return "Password must contain letters and numbers."
+    if all(c.isalnum() for c in password):
+        return "Password must contain at least one symbol."
+    return None
+
+
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt(rounds=12)).decode()
 
@@ -30,12 +43,13 @@ def verify_against_dummy(password: str) -> None:
     verify_password(password, _DUMMY_HASH)
 
 
-def create_access_token(user_id: int, role: str) -> str:
+def create_access_token(user_id: int, role: str, token_version: int = 0) -> str:
     settings = get_settings()
     now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "sub": str(user_id),
         "role": role,
+        "tv": token_version,  # must equal users.token_version, or the session is revoked
         "iat": now,
         "exp": now + timedelta(minutes=settings.access_token_minutes),
     }
