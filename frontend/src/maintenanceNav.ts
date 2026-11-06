@@ -47,10 +47,6 @@ export const MAINTENANCE_NAV: NavSection[] = [
       {
         to: '/maintenance/spare-parts', label: 'Spare Parts', title: 'Spare Parts Inventory', icon: Package,
         description: 'Stock levels, consumption and reorder alerts.',
-        planned: {
-          milestone: 'Milestone 5',
-          features: ['Stock movements with no negative stock', 'Parts consumed per work order', 'Low-stock alerts'],
-        },
       },
       {
         to: '/maintenance/reports', label: 'Reports', title: 'Maintenance Reports', icon: FileText,

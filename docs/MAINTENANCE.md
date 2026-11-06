@@ -11,7 +11,7 @@ design; it is updated as each milestone lands.
 | 2 — Equipment | Equipment register, details, maintenance history | Done |
 | 3 — Scheduling | Preventive-maintenance plans, recurring tasks, overdue flags | Done |
 | 4 — Work orders | Work-order lifecycle, breakdown tracking, repair records | Done |
-| 5 — Spare parts | Inventory, consumption, reorder alerts | Planned |
+| 5 — Spare parts | Inventory, consumption, reorder alerts | Done |
 | 6 — Analytics | Dashboard KPIs, MTTR, MTBF, PM compliance, availability, exports | Planned |
 | 7 — Quality | End-to-end, security and responsive testing; documentation | Planned |
 
@@ -191,7 +191,45 @@ equipment, search), `GET /work-orders/summary`, `GET /work-orders/{id}` (with hi
 `POST /work-orders/{id}/complete`; `GET /breakdowns`, `GET /breakdowns/summary?days=`,
 `POST /breakdowns`, `PATCH /breakdowns/{id}`, `POST /breakdowns/{id}/restore`.
 
+## Spare parts (Milestone 5)
+
+Tables `spare_parts` and `stock_movements`; rules in `backend/app/services/stock.py`.
+
+* **Stock changes only through movements**: receipt (+), issue to a work order (−), return
+  from a work order (+) and stock-count adjustment (±, reason required). Editing a part never
+  changes its quantity; a new part's opening stock is recorded as its first receipt.
+* **No negative stock.** The balance is updated by one conditional statement
+  (`UPDATE … SET on_hand = on_hand + Δ WHERE id = … AND on_hand + Δ >= 0 RETURNING on_hand`)
+  on a row locked for the transaction; CHECK constraints (`on_hand >= 0`,
+  `balance_after >= 0`) back it up. Two people drawing the last units at the same moment:
+  one succeeds, the other gets 409 (tested with two simultaneous sessions).
+* **No duplicate deductions.** Every stock action carries a client-generated `request_id`
+  (created once when the dialog opens). A retry or double-click with the same id returns the
+  movement already recorded; a concurrent duplicate loses on the unique constraint and its
+  whole transaction, including the stock update, is rolled back. Reusing an id for a
+  different movement is refused.
+* **Ledger.** Each movement stores the signed quantity, the balance right after it, the cost
+  at that time, the work order (issues and returns), reference (GRN), note, user and time.
+* **Parts consumed** by a work order = issues − returns per part, priced at the cost recorded
+  on each movement. Parts can be issued only to assigned / in-progress / awaiting-parts work;
+  returns (never more than issued) are also allowed after completion. Technicians may draw
+  parts only for their own work orders; storekeepers and planners for any.
+* **Quantities** have at most 3 decimals; `each` and `set` are whole numbers. Costs are shown
+  in KES.
+* **Low stock**: on hand ≤ reorder level (when a reorder level is set); out of stock: zero.
+  The Spare Parts page shows a reorder banner and filters; the stock value counts only parts
+  with a known unit cost and says how many were excluded.
+
+API under `/api/maintenance`: `GET /parts` (search, `stock=low|out|attention`, category),
+`GET /parts/summary`, `GET /parts/{id}` (with the last 100 movements), `POST /parts`,
+`PATCH /parts/{id}`, `POST /parts/{id}/receive`, `POST /parts/{id}/adjust`;
+`GET /work-orders/{id}/parts`, `POST /work-orders/{id}/parts` (issue),
+`POST /work-orders/{id}/parts/return`. Catalogue, receipts and counts need `parts.manage`;
+issues and returns `parts.consume`.
+
 ## Migrations
+
+`f7b1d4e5a6c8` creates the spare-part and stock-movement tables (new tables only).
 
 `e6a0c3d4f5b7` creates the work-order, work-order-event and breakdown tables and two number
 sequences (new objects only).

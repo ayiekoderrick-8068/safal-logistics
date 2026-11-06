@@ -115,16 +115,16 @@ export function PreventivePage() {
 
       {/* Two columns on phones so technicians reach their tasks without a long scroll. */}
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
-        <StatCard icon={TriangleAlert} tone="red" label="Overdue" value={formatNumber(s?.overdue)} note="Past due, not completed" />
-        <StatCard icon={CalendarClock} tone="amber" label="Due Today" value={formatNumber(s?.due_today)} />
-        <StatCard icon={CalendarCheck} tone="blue" label="Next 7 Days" value={formatNumber(s?.due_next_7_days)}
+        <StatCard compact icon={TriangleAlert} tone="red" label="Overdue" value={formatNumber(s?.overdue)} note="Past due, not completed" />
+        <StatCard compact icon={CalendarClock} tone="amber" label="Due Today" value={formatNumber(s?.due_today)} />
+        <StatCard compact icon={CalendarCheck} tone="blue" label="Next 7 Days" value={formatNumber(s?.due_next_7_days)}
           note={s ? `${s.open} open in total` : undefined} />
-        <StatCard icon={CircleCheck} tone="green" label="On-time PM"
+        <StatCard compact icon={CircleCheck} tone="green" label="On-time PM"
           value={compliance ? (compliance.pct == null ? '—' : formatPercent(compliance.pct)) : '…'}
           note={compliance ? (compliance.due === 0
             ? `No tasks fell due in the last ${compliance.window_days} days`
             : `${compliance.completed_on_time} of ${compliance.due} on time · last ${compliance.window_days} days`) : undefined} />
-        <StatCard icon={ClipboardCheck} tone="teal" label="Active Plans" value={formatNumber(s?.active_plans)}
+        <StatCard compact icon={ClipboardCheck} tone="teal" label="Active Plans" value={formatNumber(s?.active_plans)}
           note={s ? `${s.completed_last_30_days} completed in 30 days` : undefined} />
       </div>
 

@@ -305,6 +305,97 @@ export interface BreakdownSummary {
   categories: { category: FaultCategory; breakdowns: number; downtime_minutes: number }[]
 }
 
+// ---------- Spare parts ----------
+export type StockUnit = 'each' | 'set' | 'metre' | 'litre' | 'kg'
+export type MovementKind = 'receipt' | 'issue' | 'return' | 'adjustment'
+export type StockState = 'out_of_stock' | 'low' | 'ok'
+
+export const UNIT_LABELS: Record<StockUnit, string> = { each: 'Each', set: 'Set', metre: 'Metre', litre: 'Litre', kg: 'Kilogram' }
+export const WHOLE_UNITS: StockUnit[] = ['each', 'set']
+export const MOVEMENT_LABELS: Record<MovementKind, string> = {
+  receipt: 'Received', issue: 'Issued', return: 'Returned', adjustment: 'Stock count',
+}
+export const STOCK_STATE_LABELS: Record<StockState, string> = { out_of_stock: 'Out of stock', low: 'Low stock', ok: 'In stock' }
+
+export interface SparePart {
+  id: number
+  part_number: string
+  name: string
+  description: string | null
+  category: string | null
+  unit: StockUnit
+  on_hand: number
+  reorder_level: number
+  reorder_quantity: number | null
+  location: string | null
+  supplier: string | null
+  unit_cost: number | null
+  is_active: boolean
+  stock_state: StockState
+  stock_value: number | null
+}
+
+export interface StockMovement {
+  id: number
+  occurred_at: string
+  kind: MovementKind
+  quantity: number
+  balance_after: number
+  work_order: { id: number; number: string; status: WorkOrderStatus } | null
+  reference: string | null
+  note: string | null
+  actor: Person | null
+}
+
+export interface SparePartDetail extends SparePart {
+  movements: StockMovement[]
+  issued_last_90_days: number
+}
+
+export interface PartsSummary {
+  active_parts: number
+  low_stock: number
+  out_of_stock: number
+  stock_value: number
+  parts_without_cost: number
+}
+
+export interface WorkOrderParts {
+  work_order: { id: number; number: string; status: WorkOrderStatus }
+  lines: { part: SparePart; issued: number; returned: number; net: number; cost: number | null }[]
+  movements: StockMovement[]
+  total_cost: number | null
+  can_issue: boolean
+}
+
+export function qty(n: number, unit: StockUnit): string {
+  const text = Number.isInteger(n) ? String(n) : n.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')
+  return `${text} ${unit === 'kg' ? 'kg' : unit}`
+}
+
+/** Short form for stat cards, e.g. "KES 114K" (the exact amount is shown alongside). */
+export const moneyCompact = (n: number) =>
+  `KES ${new Intl.NumberFormat('en-KE', { notation: 'compact', maximumFractionDigits: 1 }).format(n)}`
+
+export const money = (n: number | null | undefined) =>
+  n == null ? '—' : `KES ${new Intl.NumberFormat('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)}`
+
+/** Mirrors the server rule: positive, at most 3 decimals, whole numbers for counted units. */
+export function quantityProblem(raw: string, unit: StockUnit, label = 'quantity', allowZero = false): string | null {
+  const n = Number(raw)
+  if (raw.trim() === '' || !Number.isFinite(n)) return `Enter the ${label}.`
+  if (allowZero ? n < 0 : n <= 0) return `The ${label} must be ${allowZero ? 'zero or more' : 'more than zero'}.`
+  if (!/^\d+(\.\d{1,3})?$/.test(raw.trim())) return `The ${label} allows at most 3 decimals.`
+  if (WHOLE_UNITS.includes(unit) && !Number.isInteger(n)) return `The ${label} must be a whole number.`
+  return null
+}
+
+/** One id per user action: a retried or double-clicked submit is applied only once. */
+export const newRequestId = () =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
+
 /** Fired after any change that can move maintenance counts (e.g. the top-bar alert). */
 export const MAINTENANCE_CHANGED = 'logitrack:maintenance-changed'
 export function notifyMaintenanceChanged() {

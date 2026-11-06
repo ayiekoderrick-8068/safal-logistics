@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { AuthProvider } from '../../../auth/AuthContext'
 import { AppRoutes } from '../../../App'
 
@@ -37,6 +37,9 @@ function setup() {
     if (url === '/api/maintenance/work-orders/21/complete' && init?.method === 'POST') {
       return Promise.resolve(json({ ...WO, status: 'completed', allowed_transitions: [] }))
     }
+    if (url.startsWith('/api/maintenance/work-orders/21/parts')) {
+      return Promise.resolve(json({ work_order: { id: 21, number: WO.number, status: WO.status }, lines: [], movements: [], total_cost: 0, can_issue: true }))
+    }
     if (url.startsWith('/api/maintenance/work-orders/21')) return Promise.resolve(json(WO))
     if (url.startsWith('/api/maintenance/work-orders')) return Promise.resolve(json({ items: [WO], total: 1, limit: 10, offset: 0 }))
     return Promise.resolve(json({}))
@@ -45,6 +48,12 @@ function setup() {
   render(<MemoryRouter initialEntries={['/maintenance/work-orders']}><AuthProvider><AppRoutes /></AuthProvider></MemoryRouter>)
   return fetchMock
 }
+
+// The page is lazy-loaded by the router; load it once up front so the first test does not
+// pay the module-transform cost inside its own timeout.
+beforeAll(async () => {
+  await import('./WorkOrdersPage')
+}, 60_000)
 
 describe('work orders', () => {
   it('lets the assigned technician progress work but not cancel or reassign it', async () => {

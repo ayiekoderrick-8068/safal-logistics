@@ -3,6 +3,7 @@ for technicians and audit actors. Imported by `models` so Alembic sees the table
 
 import enum
 from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import (
@@ -12,6 +13,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Index,
+    Numeric,
     String,
     Text,
     func,
@@ -366,4 +368,92 @@ class WorkOrderEvent(Base):
     note: Mapped[str | None] = mapped_column(Text)
     actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
 
+    actor: Mapped[User | None] = relationship()
+
+
+# ---------- Spare parts (Milestone 5) ----------
+class StockUnit(enum.StrEnum):
+    EACH = "each"
+    SET = "set"
+    METRE = "metre"
+    LITRE = "litre"
+    KILOGRAM = "kg"
+
+
+WHOLE_UNITS = (StockUnit.EACH, StockUnit.SET)  # counted, never fractional
+
+
+class MovementKind(enum.StrEnum):
+    RECEIPT = "receipt"  # goods received into the store (+)
+    ISSUE = "issue"  # issued to a work order (-)
+    RETURN = "return"  # unused parts returned from a work order (+)
+    ADJUSTMENT = "adjustment"  # stock count correction (+/-), reason required
+
+
+class SparePart(TimestampMixin, Base):
+    """A stocked spare part. `on_hand` only changes through stock movements."""
+
+    __tablename__ = "spare_parts"
+    __table_args__ = (
+        CheckConstraint("on_hand >= 0", name="on_hand_non_negative"),
+        CheckConstraint("reorder_level >= 0", name="reorder_level_non_negative"),
+        CheckConstraint("unit_cost IS NULL OR unit_cost >= 0", name="unit_cost_non_negative"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    part_number: Mapped[str] = mapped_column(String(40), unique=True)
+    name: Mapped[str] = mapped_column(String(120))
+    description: Mapped[str | None] = mapped_column(Text)
+    category: Mapped[str | None] = mapped_column(String(60))
+    unit: Mapped[StockUnit] = mapped_column(_enum(StockUnit, "stock_unit"))
+    on_hand: Mapped[Decimal] = mapped_column(Numeric(12, 3), default=Decimal(0))
+    reorder_level: Mapped[Decimal] = mapped_column(Numeric(12, 3), default=Decimal(0))
+    reorder_quantity: Mapped[Decimal | None] = mapped_column(Numeric(12, 3))
+    location: Mapped[str | None] = mapped_column(String(80))  # store / bin
+    supplier: Mapped[str | None] = mapped_column(String(120))
+    unit_cost: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    is_active: Mapped[bool] = mapped_column(default=True, server_default=text("true"))
+
+
+class StockMovement(Base):
+    """Append-only stock ledger. `quantity` is signed; `balance_after` is the stock level right
+    after this movement, so the history can be audited line by line."""
+
+    __tablename__ = "stock_movements"
+    __table_args__ = (
+        CheckConstraint("quantity <> 0", name="quantity_non_zero"),
+        CheckConstraint("balance_after >= 0", name="balance_non_negative"),
+        CheckConstraint(
+            "(kind = 'issue' AND quantity < 0) OR (kind IN ('receipt', 'return') AND quantity > 0)"
+            " OR kind = 'adjustment'",
+            name="sign_matches_kind",
+        ),
+        CheckConstraint(
+            "(kind IN ('issue', 'return')) = (work_order_id IS NOT NULL)",
+            name="work_order_for_issue_and_return",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    part_id: Mapped[int] = mapped_column(
+        ForeignKey("spare_parts.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[MovementKind] = mapped_column(_enum(MovementKind, "stock_movement_kind"))
+    quantity: Mapped[Decimal] = mapped_column(Numeric(12, 3))
+    balance_after: Mapped[Decimal] = mapped_column(Numeric(12, 3))
+    work_order_id: Mapped[int | None] = mapped_column(
+        ForeignKey("work_orders.id", ondelete="RESTRICT"), index=True
+    )
+    reference: Mapped[str | None] = mapped_column(String(80))  # GRN / delivery note
+    note: Mapped[str | None] = mapped_column(String(255))
+    unit_cost: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))  # cost at the time
+    # Client-generated key: a retried or double-submitted request is applied only once.
+    request_id: Mapped[str | None] = mapped_column(String(64), unique=True)
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+
+    part: Mapped[SparePart] = relationship()
+    work_order: Mapped[WorkOrder | None] = relationship()
     actor: Mapped[User | None] = relationship()

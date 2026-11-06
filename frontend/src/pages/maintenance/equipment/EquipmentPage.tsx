@@ -125,12 +125,12 @@ export function EquipmentPage() {
       />
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
-        <StatCard icon={Wrench} tone="blue" label="Registered Equipment" value={formatNumber(s?.total)}
+        <StatCard compact icon={Wrench} tone="blue" label="Registered Equipment" value={formatNumber(s?.total)}
           note={s ? `${s.archived} archived` : undefined} />
-        <StatCard icon={CircleCheck} tone="green" label="Operational" value={formatNumber(s?.operational)} />
-        <StatCard icon={Wrench} tone="amber" label="Under Maintenance" value={formatNumber(s?.under_maintenance)} />
-        <StatCard icon={CircleOff} tone="red" label="Out of Service" value={formatNumber(s?.out_of_service)} />
-        <StatCard icon={s?.service_overdue ? TriangleAlert : CalendarClock} tone={s?.service_overdue ? 'red' : 'teal'}
+        <StatCard compact icon={CircleCheck} tone="green" label="Operational" value={formatNumber(s?.operational)} />
+        <StatCard compact icon={Wrench} tone="amber" label="Under Maintenance" value={formatNumber(s?.under_maintenance)} />
+        <StatCard compact icon={CircleOff} tone="red" label="Out of Service" value={formatNumber(s?.out_of_service)} />
+        <StatCard compact icon={s?.service_overdue ? TriangleAlert : CalendarClock} tone={s?.service_overdue ? 'red' : 'teal'}
           label="Service Overdue" value={formatNumber(s?.service_overdue)}
           note={s ? `${s.service_due_soon} due within ${s.due_soon_days} days` : undefined} />
       </div>

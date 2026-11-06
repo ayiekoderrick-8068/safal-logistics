@@ -17,6 +17,7 @@ export function StatCard({
   label,
   trend,
   note,
+  compact = false,
 }: {
   icon: LucideIcon
   tone: keyof typeof TONES
@@ -24,15 +25,18 @@ export function StatCard({
   label: string
   trend?: Trend | null
   note?: string
+  /** For two-column grids on phones: no icon and a smaller figure below the sm breakpoint. */
+  compact?: boolean
 }) {
   const TrendIcon = trend?.direction === 'up' ? ArrowUp : trend?.direction === 'down' ? ArrowDown : Minus
   return (
-    <article className="card flex items-center gap-3.5 px-4 py-4" aria-label={label}>
-      <span className={clsx('grid size-13 shrink-0 place-items-center rounded-2xl', TONES[tone])}>
+    <article className={clsx('card flex items-center gap-3.5 py-4', compact ? 'px-3.5 sm:px-4' : 'px-4')} aria-label={label}>
+      <span className={clsx('size-13 shrink-0 place-items-center rounded-2xl', TONES[tone], compact ? 'hidden sm:grid' : 'grid')}>
         <Icon className="size-7" strokeWidth={2} aria-hidden />
       </span>
       <div className="min-w-0">
-        <p className="text-[1.6rem] leading-tight font-bold text-ink" data-testid="stat-value">{value}</p>
+        <p className={clsx('leading-tight font-bold break-words text-ink', compact ? 'text-xl sm:text-[1.6rem]' : 'text-[1.6rem]')}
+          data-testid="stat-value">{value}</p>
         <p className="text-[0.95rem] leading-snug text-ink">{label}</p>
         {(trend || note) && (
           <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[0.82rem]">

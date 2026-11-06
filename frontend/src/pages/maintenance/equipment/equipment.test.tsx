@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { AuthProvider } from '../../../auth/AuthContext'
 import { AppRoutes } from '../../../App'
 
@@ -48,6 +48,12 @@ function setup(permissions: string[]) {
   render(<MemoryRouter initialEntries={['/maintenance/equipment']}><AuthProvider><AppRoutes /></AuthProvider></MemoryRouter>)
   return fetchMock
 }
+
+// The page is lazy-loaded by the router; load it once up front so the first test does not
+// pay the module-transform cost inside its own timeout.
+beforeAll(async () => {
+  await import('./EquipmentPage')
+}, 60_000)
 
 describe('equipment register', () => {
   it('lists equipment with live counts, service state and history', async () => {

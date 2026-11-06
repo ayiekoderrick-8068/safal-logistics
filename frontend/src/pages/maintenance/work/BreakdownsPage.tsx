@@ -69,12 +69,12 @@ export function BreakdownsPage() {
       />
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-        <StatCard icon={TriangleAlert} tone="red" label="Open Breakdowns" value={formatNumber(s?.open)} note="Not yet restored" />
-        <StatCard icon={Wrench} tone="amber" label="Breakdowns" value={formatNumber(s?.breakdowns)}
+        <StatCard compact icon={TriangleAlert} tone="red" label="Open Breakdowns" value={formatNumber(s?.open)} note="Not yet restored" />
+        <StatCard compact icon={Wrench} tone="amber" label="Breakdowns" value={formatNumber(s?.breakdowns)}
           note={s ? `Last ${s.window_days} days` : undefined} />
-        <StatCard icon={Clock} tone="blue" label="Downtime" value={s ? formatDuration(s.downtime_minutes) : '…'}
+        <StatCard compact icon={Clock} tone="blue" label="Downtime" value={s ? formatDuration(s.downtime_minutes) : '…'}
           note={s ? `Last ${s.window_days} days, stopped equipment only` : undefined} />
-        <StatCard icon={Repeat} tone="teal" label="Repeat Failures" value={formatNumber(s?.repeat_equipment)}
+        <StatCard compact icon={Repeat} tone="teal" label="Repeat Failures" value={formatNumber(s?.repeat_equipment)}
           note="Assets with 2+ breakdowns" />
       </div>
 

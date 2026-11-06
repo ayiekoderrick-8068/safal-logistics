@@ -1,5 +1,6 @@
 from datetime import date, datetime
-from typing import Any, Self
+from decimal import Decimal
+from typing import Annotated, Any, Self
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -10,7 +11,9 @@ from .models_maintenance import (
     EquipmentStatus,
     FaultCategory,
     IntervalUnit,
+    MovementKind,
     ScheduleBasis,
+    StockUnit,
     TaskStatus,
     WorkOrderPriority,
     WorkOrderStatus,
@@ -539,3 +542,148 @@ class WorkOrderSummary(BaseModel):
     completed_last_30_days: int
     overdue: int
     critical_open: int
+
+
+# ---------- Spare parts ----------
+PART_NUMBER = r"^[A-Z0-9][A-Z0-9./_-]{1,39}$"
+Qty = Annotated[Decimal, Field(max_digits=12, decimal_places=3)]
+Money = Annotated[Decimal, Field(ge=0, max_digits=12, decimal_places=2)]
+RequestId = Annotated[str, Field(min_length=8, max_length=64, pattern=r"^[A-Za-z0-9-]+$")]
+
+
+class _PartFields(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+    description: str | None = Field(default=None, max_length=2000)
+    category: str | None = Field(default=None, max_length=60)
+    reorder_level: Qty = Decimal(0)
+    reorder_quantity: Qty | None = None
+    location: str | None = Field(default=None, max_length=80)
+    supplier: str | None = Field(default=None, max_length=120)
+    unit_cost: Money | None = None
+
+    @field_validator("name", "category", "location", "supplier", mode="before")
+    @classmethod
+    def _t(cls, v: object) -> object:
+        return _text(v)
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def _d(cls, v: object) -> object:
+        return _long_text(v)
+
+
+class PartIn(_PartFields):
+    part_number: str = Field(pattern=PART_NUMBER)
+    unit: StockUnit
+    opening_quantity: Qty = Field(default=Decimal(0), description="Recorded as the first receipt")
+
+    @field_validator("part_number", mode="before")
+    @classmethod
+    def _upper(cls, v: object) -> object:
+        return str(v).strip().upper() if v is not None else v
+
+
+class PartUpdate(BaseModel):
+    """Stock levels never change here: use receipts, issues, returns and adjustments."""
+
+    name: str | None = Field(default=None, min_length=2, max_length=120)
+    description: str | None = Field(default=None, max_length=2000)
+    category: str | None = Field(default=None, max_length=60)
+    reorder_level: Qty | None = None
+    reorder_quantity: Qty | None = None
+    location: str | None = Field(default=None, max_length=80)
+    supplier: str | None = Field(default=None, max_length=120)
+    unit_cost: Money | None = None
+    is_active: bool | None = None
+
+    @field_validator("name", "category", "location", "supplier", mode="before")
+    @classmethod
+    def _t(cls, v: object) -> object:
+        return _text(v)
+
+
+class StockReceipt(BaseModel):
+    quantity: Qty
+    reference: str | None = Field(default=None, max_length=80, description="GRN / delivery note")
+    unit_cost: Money | None = None
+    note: str | None = Field(default=None, max_length=255)
+    request_id: RequestId | None = None
+
+
+class StockAdjustment(BaseModel):
+    counted_quantity: Qty = Field(ge=0, description="The quantity physically counted")
+    reason: str = Field(min_length=3, max_length=255)
+    request_id: RequestId | None = None
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def _r(cls, v: object) -> object:
+        return _text(v) or ""
+
+
+class PartIssue(BaseModel):
+    part_id: int
+    quantity: Qty
+    note: str | None = Field(default=None, max_length=255)
+    request_id: RequestId = Field(description="Generate once per action; retries reuse it")
+
+
+class PartOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    part_number: str
+    name: str
+    description: str | None
+    category: str | None
+    unit: StockUnit
+    on_hand: float
+    reorder_level: float
+    reorder_quantity: float | None
+    location: str | None
+    supplier: str | None
+    unit_cost: float | None
+    is_active: bool
+    stock_state: str  # out_of_stock | low | ok
+    stock_value: float | None  # on_hand x unit_cost, when the cost is known
+
+
+class MovementOut(BaseModel):
+    id: int
+    occurred_at: datetime
+    kind: MovementKind
+    quantity: float
+    balance_after: float
+    work_order: WorkOrderBrief | None
+    reference: str | None
+    note: str | None
+    actor: Person | None
+
+
+class PartDetail(PartOut):
+    movements: list[MovementOut]
+    issued_last_90_days: float
+
+
+class PartsSummary(BaseModel):
+    active_parts: int
+    low_stock: int
+    out_of_stock: int
+    stock_value: float
+    parts_without_cost: int  # excluded from the stock value
+
+
+class ConsumedPart(BaseModel):
+    part: PartOut
+    issued: float
+    returned: float
+    net: float
+    cost: float | None
+
+
+class WorkOrderParts(BaseModel):
+    work_order: WorkOrderBrief
+    lines: list[ConsumedPart]
+    movements: list[MovementOut]
+    total_cost: float | None  # None when any consumed part has no cost
+    can_issue: bool

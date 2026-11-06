@@ -30,6 +30,7 @@ import {
 } from '../../../lib/maintenance'
 import type { Page } from '../../../lib/types'
 import { priorityTone, woTone } from '../equipment/tones'
+import { WorkOrderPartsSection } from '../parts/WorkOrderPartsSection'
 import { CancelWorkOrderModal, CompleteWorkOrderModal, EditWorkOrderModal, NewWorkOrderModal } from './WorkModals'
 
 const PAGE_SIZE = 10
@@ -110,13 +111,13 @@ export function WorkOrdersPage() {
       />
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
-        <StatCard icon={ClipboardList} tone="amber" label="Open" value={formatNumber(s?.open)}
+        <StatCard compact icon={ClipboardList} tone="amber" label="Open" value={formatNumber(s?.open)}
           note={s ? `${s.assigned} assigned` : undefined} />
-        <StatCard icon={Play} tone="blue" label="In Progress" value={formatNumber(s?.in_progress)} />
-        <StatCard icon={PackageSearch} tone="amber" label="Awaiting Parts" value={formatNumber(s?.awaiting_parts)} />
-        <StatCard icon={TriangleAlert} tone="red" label="Overdue" value={formatNumber(s?.overdue)}
+        <StatCard compact icon={Play} tone="blue" label="In Progress" value={formatNumber(s?.in_progress)} />
+        <StatCard compact icon={PackageSearch} tone="amber" label="Awaiting Parts" value={formatNumber(s?.awaiting_parts)} />
+        <StatCard compact icon={TriangleAlert} tone="red" label="Overdue" value={formatNumber(s?.overdue)}
           note={s ? `${s.critical_open} critical open` : undefined} />
-        <StatCard icon={CircleCheck} tone="green" label="Completed" value={formatNumber(s?.completed_last_30_days)} note="Last 30 days" />
+        <StatCard compact icon={CircleCheck} tone="green" label="Completed" value={formatNumber(s?.completed_last_30_days)} note="Last 30 days" />
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -298,7 +299,7 @@ function WorkOrderPanel({ id, version, selfId, canAssign, canWork, onMove, onOpe
         </div>
       )}
       {wo.cancel_reason && <p className="mt-3 rounded-xl bg-surface-muted px-3 py-2.5 text-sm text-ink">Cancelled: {wo.cancel_reason}</p>}
-      <p className="mt-3 text-xs text-ink-muted">Parts consumed are recorded against work orders once spare-parts inventory is introduced.</p>
+      <WorkOrderPartsSection woId={wo.id} woNumber={wo.number} version={version} />
 
       <h3 className="mt-5 mb-2 flex items-center gap-2 text-sm font-bold text-ink">
         <Hourglass className="size-4 text-primary" aria-hidden /> Status history
