@@ -5,11 +5,16 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from .models import MaintenanceRole
 from .models_maintenance import (
+    BreakdownSeverity,
     EquipmentCategory,
     EquipmentStatus,
+    FaultCategory,
     IntervalUnit,
     ScheduleBasis,
     TaskStatus,
+    WorkOrderPriority,
+    WorkOrderStatus,
+    WorkOrderType,
 )
 
 CODE_PATTERN = r"^[A-Z0-9][A-Z0-9-]{1,29}$"
@@ -331,3 +336,206 @@ class PmSummary(BaseModel):
     active_plans: int
     completed_last_30_days: int
     compliance: PmCompliance
+
+
+# ---------- Breakdowns ----------
+def _long_text(v: object) -> object:
+    return (v.strip() or None) if isinstance(v, str) else v
+
+
+class BreakdownIn(BaseModel):
+    equipment_id: int
+    started_at: datetime = Field(description="When the failure began")
+    severity: BreakdownSeverity
+    category: FaultCategory
+    description: str = Field(min_length=5, max_length=4000)
+    possible_cause: str | None = Field(default=None, max_length=4000)
+    equipment_down: bool = True
+    create_work_order: bool = Field(
+        default=True, description="Also raise a corrective work order for the repair"
+    )
+
+    @field_validator("description", "possible_cause", mode="before")
+    @classmethod
+    def _t(cls, v: object) -> object:
+        return _long_text(v)
+
+
+class BreakdownUpdate(BaseModel):
+    severity: BreakdownSeverity | None = None
+    category: FaultCategory | None = None
+    description: str | None = Field(default=None, min_length=5, max_length=4000)
+    possible_cause: str | None = Field(default=None, max_length=4000)
+    actions_taken: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("description", "possible_cause", "actions_taken", mode="before")
+    @classmethod
+    def _t(cls, v: object) -> object:
+        return _long_text(v)
+
+
+class BreakdownRestore(BaseModel):
+    restored_at: datetime
+    actions_taken: str = Field(min_length=5, max_length=4000, description="Repairs and actions")
+
+    @field_validator("actions_taken", mode="before")
+    @classmethod
+    def _t(cls, v: object) -> object:
+        return _long_text(v) or ""
+
+
+class WorkOrderBrief(BaseModel):
+    id: int
+    number: str
+    status: WorkOrderStatus
+
+
+class BreakdownOut(BaseModel):
+    id: int
+    number: str
+    equipment: EquipmentRef
+    started_at: datetime
+    restored_at: datetime | None
+    is_open: bool
+    downtime_minutes: int  # to restoration, or to now while still open
+    severity: BreakdownSeverity
+    category: FaultCategory
+    description: str
+    possible_cause: str | None
+    actions_taken: str | None
+    equipment_down: bool
+    reported_by: Person | None
+    restored_by: Person | None
+    work_orders: list[WorkOrderBrief]
+
+
+class RankedEquipment(BaseModel):
+    equipment: EquipmentRef
+    breakdowns: int
+    downtime_minutes: int
+
+
+class CategoryCount(BaseModel):
+    category: FaultCategory
+    breakdowns: int
+    downtime_minutes: int
+
+
+class BreakdownSummary(BaseModel):
+    """Breakdowns overlapping the last `window_days`; downtime is clipped to the window and
+    counts only failures that stopped the asset."""
+
+    window_days: int
+    open: int
+    breakdowns: int
+    downtime_minutes: int
+    repeat_equipment: int  # assets with 2+ breakdowns in the window
+    top_equipment: list[RankedEquipment]
+    categories: list[CategoryCount]
+
+
+# ---------- Work orders ----------
+class WorkOrderIn(BaseModel):
+    equipment_id: int
+    maintenance_type: WorkOrderType
+    priority: WorkOrderPriority
+    fault_description: str = Field(min_length=5, max_length=4000)
+    scheduled_on: date | None = None
+    assigned_technician_id: int | None = None
+    breakdown_id: int | None = None
+
+    @field_validator("fault_description", mode="before")
+    @classmethod
+    def _t(cls, v: object) -> object:
+        return _long_text(v)
+
+
+class WorkOrderUpdate(BaseModel):
+    priority: WorkOrderPriority | None = None
+    fault_description: str | None = Field(default=None, min_length=5, max_length=4000)
+    scheduled_on: date | None = None
+    assigned_technician_id: int | None = None
+
+    @field_validator("fault_description", mode="before")
+    @classmethod
+    def _t(cls, v: object) -> object:
+        return _long_text(v)
+
+
+class WorkOrderTransition(BaseModel):
+    to: WorkOrderStatus
+    note: str | None = Field(default=None, max_length=1000, description="Required to cancel")
+
+    @field_validator("note", mode="before")
+    @classmethod
+    def _t(cls, v: object) -> object:
+        return _text(v)
+
+
+class WorkOrderComplete(BaseModel):
+    work_performed: str = Field(min_length=10, max_length=4000)
+    completion_notes: str | None = Field(default=None, max_length=4000)
+    completed_at: datetime | None = Field(default=None, description="Defaults to now")
+    restore_breakdown: bool = Field(
+        default=False, description="Also record the linked breakdown as restored at completion"
+    )
+
+    @field_validator("work_performed", "completion_notes", mode="before")
+    @classmethod
+    def _t(cls, v: object) -> object:
+        return _long_text(v)
+
+
+class WorkOrderEventOut(BaseModel):
+    id: int
+    occurred_at: datetime
+    from_status: WorkOrderStatus | None
+    to_status: WorkOrderStatus | None
+    summary: str
+    note: str | None
+    actor: Person | None
+
+
+class BreakdownBrief(BaseModel):
+    id: int
+    number: str
+    is_open: bool
+    started_at: datetime
+    restored_at: datetime | None
+
+
+class WorkOrderOut(BaseModel):
+    id: int
+    number: str
+    equipment: EquipmentRef
+    maintenance_type: WorkOrderType
+    priority: WorkOrderPriority
+    status: WorkOrderStatus
+    fault_description: str
+    assigned_technician: Person | None
+    scheduled_on: date | None
+    overdue: bool  # scheduled date passed and not completed or cancelled
+    created_at: datetime
+    created_by: Person | None
+    started_at: datetime | None
+    completed_at: datetime | None
+    repair_minutes: int | None  # start to completion
+    work_performed: str | None
+    completion_notes: str | None
+    cancel_reason: str | None
+    breakdown: BreakdownBrief | None
+    allowed_transitions: list[WorkOrderStatus]
+
+
+class WorkOrderDetail(WorkOrderOut):
+    history: list[WorkOrderEventOut]
+
+
+class WorkOrderSummary(BaseModel):
+    open: int
+    assigned: int
+    in_progress: int
+    awaiting_parts: int
+    completed_last_30_days: int
+    overdue: int
+    critical_open: int

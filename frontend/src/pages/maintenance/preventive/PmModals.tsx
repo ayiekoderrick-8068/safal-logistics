@@ -1,92 +1,17 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useState } from 'react'
 import { inputClass } from '../../../components/ui/buttons'
-import { Field, FormActions, FormError } from '../../../components/ui/Form'
-import { Modal } from '../../../components/ui/Modal'
-import { useApi } from '../../../hooks/useApi'
-import { api, ApiError } from '../../../lib/api'
-import { formatDate, MAINTENANCE_ROLE_LABELS } from '../../../lib/format'
-import type { Equipment, EquipmentOptions, IntervalUnit, MaintenancePlan, MaintenanceTask, ScheduleBasis } from '../../../lib/maintenance'
-import type { Page } from '../../../lib/types'
+import { Field } from '../../../components/ui/Form'
+import { formatDate } from '../../../lib/format'
+import {
+  send as post,
+  techId,
+  type IntervalUnit,
+  type MaintenancePlan,
+  type MaintenanceTask,
+  type ScheduleBasis,
+} from '../../../lib/maintenance'
 import { todayIso } from '../../../lib/time'
-
-/** Small form-in-a-modal: runs `action`, shows the server's message on failure. */
-function ActionModal<T>({
-  title, description, submitLabel, onClose, onDone, action, validate, wide, children,
-}: {
-  title: string
-  description?: string
-  submitLabel: string
-  onClose: () => void
-  onDone: (result: T) => void
-  action: () => Promise<T>
-  validate?: () => string | null
-  wide?: boolean
-  children: ReactNode
-}) {
-  const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState(false)
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    const problem = validate?.()
-    if (problem) {
-      setError(problem)
-      return
-    }
-    setBusy(true)
-    setError(null)
-    try {
-      onDone(await action())
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Something went wrong. Please try again.')
-      setBusy(false)
-    }
-  }
-  return (
-    <Modal title={title} description={description} onClose={onClose} wide={wide}>
-      <form onSubmit={submit} noValidate className="space-y-4">
-        <FormError message={error} />
-        {children}
-        <FormActions submitLabel={submitLabel} submitting={busy} onCancel={onClose} />
-      </form>
-    </Modal>
-  )
-}
-
-const post = <T,>(path: string, body: unknown, method = 'POST') =>
-  api<T>(path, { method, body: JSON.stringify(body) })
-
-function useTechnicians() {
-  return useApi<EquipmentOptions>('/maintenance/equipment/options').data?.technicians ?? []
-}
-
-function TechnicianSelect({ id, value, onChange }: { id: string; value: string; onChange: (v: string) => void }) {
-  const technicians = useTechnicians()
-  return (
-    <Field id={id} label="Assigned technician">
-      <select id={id} value={value} onChange={(e) => onChange(e.target.value)} className={inputClass}>
-        <option value="">Unassigned</option>
-        {technicians.map((t) => (
-          <option key={t.id} value={t.id}>{t.full_name} · {MAINTENANCE_ROLE_LABELS[t.maintenance_role]}</option>
-        ))}
-      </select>
-    </Field>
-  )
-}
-
-function EquipmentSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const { data } = useApi<Page<Equipment>>('/maintenance/equipment?limit=100')
-  return (
-    <Field id="pm-equipment" label="Equipment"
-      hint={data && data.total > data.items.length ? `Showing the first ${data.items.length} of ${data.total}.` : undefined}>
-      <select id="pm-equipment" value={value} onChange={(e) => onChange(e.target.value)} className={inputClass}>
-        <option value="">Choose equipment…</option>
-        {data?.items.map((e) => <option key={e.id} value={e.id}>{e.code} · {e.name}</option>)}
-      </select>
-    </Field>
-  )
-}
-
-const techId = (v: string) => (v ? Number(v) : null)
+import { ActionModal, EquipmentSelect, TechnicianSelect } from '../forms'
 
 // ---------- tasks ----------
 export function CompleteTaskModal({ task, onClose, onDone }: {

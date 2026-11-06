@@ -30,6 +30,12 @@ const UsersPage = lazy(() => import('./pages/users/UsersPage').then((m) => ({ de
 const ComplianceRecordsPage = lazy(() =>
   import('./pages/compliance/ComplianceRecordsPage').then((m) => ({ default: m.ComplianceRecordsPage })),
 )
+const WorkOrdersPage = lazy(() =>
+  import('./pages/maintenance/work/WorkOrdersPage').then((m) => ({ default: m.WorkOrdersPage })),
+)
+const BreakdownsPage = lazy(() =>
+  import('./pages/maintenance/work/BreakdownsPage').then((m) => ({ default: m.BreakdownsPage })),
+)
 const PreventivePage = lazy(() =>
   import('./pages/maintenance/preventive/PreventivePage').then((m) => ({ default: m.PreventivePage })),
 )
@@ -71,6 +77,8 @@ export function AppRoutes() {
       >
         <Route path="equipment" element={<Lazy><EquipmentPage /></Lazy>} />
         <Route path="preventive" element={<Lazy><PreventivePage /></Lazy>} />
+        <Route path="work-orders" element={<Lazy><WorkOrdersPage /></Lazy>} />
+        <Route path="breakdowns" element={<Lazy><BreakdownsPage /></Lazy>} />
         {ALL_MAINTENANCE_ITEMS.filter((i) => i.planned).map((item) =>
           item.to === '/maintenance' ? (
             <Route key={item.to} index element={<ModuleRoute item={item} />} />

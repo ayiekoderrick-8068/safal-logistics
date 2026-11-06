@@ -1,5 +1,11 @@
 /** Maintenance workspace types and labels (mirrors backend schemas_maintenance.py). */
 import { useApi } from '../hooks/useApi'
+import { api } from './api'
+
+/** JSON request helper for maintenance actions (POST by default). */
+export const send = <T,>(path: string, body: unknown, method = 'POST') =>
+  api<T>(path, { method, body: JSON.stringify(body) })
+export const techId = (v: string) => (v ? Number(v) : null)
 import type { MaintenanceRole } from './types'
 
 export type EquipmentCategory =
@@ -193,6 +199,110 @@ export function useMaintenanceAccess() {
     role: data?.maintenance_role,
     can: (p: MaintenancePermission) => !!data?.permissions.includes(p),
   }
+}
+
+// ---------- Work orders and breakdowns ----------
+export type WorkOrderStatus = 'open' | 'assigned' | 'in_progress' | 'awaiting_parts' | 'completed' | 'cancelled'
+export type WorkOrderType = 'corrective' | 'preventive' | 'inspection' | 'improvement'
+export type Priority = 'low' | 'medium' | 'high' | 'critical'
+export type Severity = 'minor' | 'major' | 'critical'
+export type FaultCategory =
+  | 'mechanical' | 'electrical' | 'hydraulic' | 'pneumatic' | 'instrumentation' | 'lubrication' | 'operational' | 'other'
+
+export const WO_STATUS_LABELS: Record<WorkOrderStatus, string> = {
+  open: 'Open', assigned: 'Assigned', in_progress: 'In progress', awaiting_parts: 'Awaiting parts',
+  completed: 'Completed', cancelled: 'Cancelled',
+}
+export const WO_TYPE_LABELS: Record<WorkOrderType, string> = {
+  corrective: 'Corrective repair', preventive: 'Preventive', inspection: 'Inspection', improvement: 'Improvement',
+}
+export const PRIORITY_LABELS: Record<Priority, string> = { low: 'Low', medium: 'Medium', high: 'High', critical: 'Critical' }
+export const SEVERITY_LABELS: Record<Severity, string> = { minor: 'Minor', major: 'Major', critical: 'Critical' }
+export const FAULT_LABELS: Record<FaultCategory, string> = {
+  mechanical: 'Mechanical', electrical: 'Electrical', hydraulic: 'Hydraulic', pneumatic: 'Pneumatic',
+  instrumentation: 'Instrumentation', lubrication: 'Lubrication', operational: 'Operational / operator', other: 'Other',
+}
+
+export interface BreakdownBrief {
+  id: number
+  number: string
+  is_open: boolean
+  started_at: string
+  restored_at: string | null
+}
+
+export interface WorkOrder {
+  id: number
+  number: string
+  equipment: EquipmentRef
+  maintenance_type: WorkOrderType
+  priority: Priority
+  status: WorkOrderStatus
+  fault_description: string
+  assigned_technician: Person | null
+  scheduled_on: string | null
+  overdue: boolean
+  created_at: string
+  created_by: Person | null
+  started_at: string | null
+  completed_at: string | null
+  repair_minutes: number | null
+  work_performed: string | null
+  completion_notes: string | null
+  cancel_reason: string | null
+  breakdown: BreakdownBrief | null
+  allowed_transitions: WorkOrderStatus[]
+}
+
+export interface WorkOrderDetail extends WorkOrder {
+  history: {
+    id: number
+    occurred_at: string
+    from_status: WorkOrderStatus | null
+    to_status: WorkOrderStatus | null
+    summary: string
+    note: string | null
+    actor: Person | null
+  }[]
+}
+
+export interface WorkOrderSummary {
+  open: number
+  assigned: number
+  in_progress: number
+  awaiting_parts: number
+  completed_last_30_days: number
+  overdue: number
+  critical_open: number
+}
+
+export interface Breakdown {
+  id: number
+  number: string
+  equipment: EquipmentRef
+  started_at: string
+  restored_at: string | null
+  is_open: boolean
+  downtime_minutes: number
+  severity: Severity
+  category: FaultCategory
+  description: string
+  possible_cause: string | null
+  actions_taken: string | null
+  equipment_down: boolean
+  reported_by: Person | null
+  restored_by: Person | null
+  work_orders: { id: number; number: string; status: WorkOrderStatus }[]
+}
+
+export interface BreakdownSummary {
+  window_days: number
+  open: number
+  breakdowns: number
+  downtime_minutes: number
+  repeat_equipment: number
+  top_equipment: { equipment: EquipmentRef; breakdowns: number; downtime_minutes: number }[]
+  categories: { category: FaultCategory; breakdowns: number; downtime_minutes: number }[]
 }
 
 /** Fired after any change that can move maintenance counts (e.g. the top-bar alert). */

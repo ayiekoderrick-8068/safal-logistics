@@ -207,3 +207,163 @@ class MaintenanceTask(TimestampMixin, Base):
     equipment: Mapped[Equipment] = relationship()
     assigned_technician: Mapped[User | None] = relationship(foreign_keys=[assigned_technician_id])
     completed_by: Mapped[User | None] = relationship(foreign_keys=[completed_by_id])
+
+
+# ---------- Breakdowns and work orders (Milestone 4) ----------
+class BreakdownSeverity(enum.StrEnum):
+    MINOR = "minor"
+    MAJOR = "major"
+    CRITICAL = "critical"
+
+
+class FaultCategory(enum.StrEnum):
+    MECHANICAL = "mechanical"
+    ELECTRICAL = "electrical"
+    HYDRAULIC = "hydraulic"
+    PNEUMATIC = "pneumatic"
+    INSTRUMENTATION = "instrumentation"
+    LUBRICATION = "lubrication"
+    OPERATIONAL = "operational"  # misuse, wrong settings, operator error
+    OTHER = "other"
+
+
+class Breakdown(TimestampMixin, Base):
+    """One equipment failure, from failure start to restoration. Breakdowns of the same asset
+    never overlap (one open at a time; a new one cannot start before the last restoration),
+    so summed downtime never counts the same period twice."""
+
+    __tablename__ = "breakdowns"
+    __table_args__ = (
+        Index(
+            "uq_breakdowns_one_open_per_equipment",
+            "equipment_id",
+            unique=True,
+            postgresql_where="restored_at IS NULL",
+        ),
+        CheckConstraint(
+            "restored_at IS NULL OR restored_at >= started_at", name="restored_after_start"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    number: Mapped[str] = mapped_column(String(20), unique=True)  # BD-2026-00001
+    equipment_id: Mapped[int] = mapped_column(
+        ForeignKey("equipment.id", ondelete="CASCADE"), index=True
+    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    restored_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    severity: Mapped[BreakdownSeverity] = mapped_column(
+        _enum(BreakdownSeverity, "breakdown_severity")
+    )
+    category: Mapped[FaultCategory] = mapped_column(_enum(FaultCategory, "fault_category"))
+    description: Mapped[str] = mapped_column(Text)
+    possible_cause: Mapped[str | None] = mapped_column(Text)
+    actions_taken: Mapped[str | None] = mapped_column(Text)
+    # Whether the failure stopped the asset (counts as downtime / out of service).
+    equipment_down: Mapped[bool] = mapped_column(default=True, server_default=text("true"))
+    reported_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    restored_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+    equipment: Mapped[Equipment] = relationship()
+    reported_by: Mapped[User | None] = relationship(foreign_keys=[reported_by_id])
+    restored_by: Mapped[User | None] = relationship(foreign_keys=[restored_by_id])
+
+
+class WorkOrderType(enum.StrEnum):
+    CORRECTIVE = "corrective"  # repair after a fault or breakdown
+    PREVENTIVE = "preventive"
+    INSPECTION = "inspection"
+    IMPROVEMENT = "improvement"
+
+
+class WorkOrderPriority(enum.StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    CRITICAL = "critical"
+
+
+class WorkOrderStatus(enum.StrEnum):
+    OPEN = "open"
+    ASSIGNED = "assigned"
+    IN_PROGRESS = "in_progress"
+    AWAITING_PARTS = "awaiting_parts"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
+class WorkOrder(TimestampMixin, Base):
+    __tablename__ = "work_orders"
+    __table_args__ = (
+        CheckConstraint(
+            "(status = 'completed') = (completed_at IS NOT NULL)", name="completed_has_time"
+        ),
+        CheckConstraint(
+            "completed_at IS NULL OR (started_at IS NOT NULL AND completed_at >= started_at)",
+            name="completed_after_start",
+        ),
+        CheckConstraint(
+            "status NOT IN ('assigned', 'in_progress', 'awaiting_parts', 'completed') "
+            "OR assigned_technician_id IS NOT NULL",
+            name="active_needs_technician",
+        ),
+        CheckConstraint(
+            "(status = 'cancelled') = (cancel_reason IS NOT NULL)", name="cancelled_has_reason"
+        ),
+        Index("ix_work_orders_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    number: Mapped[str] = mapped_column(String(20), unique=True)  # WO-2026-00001
+    equipment_id: Mapped[int] = mapped_column(
+        ForeignKey("equipment.id", ondelete="CASCADE"), index=True
+    )
+    breakdown_id: Mapped[int | None] = mapped_column(
+        ForeignKey("breakdowns.id", ondelete="SET NULL"), index=True
+    )
+    maintenance_type: Mapped[WorkOrderType] = mapped_column(_enum(WorkOrderType, "work_order_type"))
+    priority: Mapped[WorkOrderPriority] = mapped_column(
+        _enum(WorkOrderPriority, "work_order_priority")
+    )
+    status: Mapped[WorkOrderStatus] = mapped_column(
+        _enum(WorkOrderStatus, "work_order_status"), default=WorkOrderStatus.OPEN
+    )
+    fault_description: Mapped[str] = mapped_column(Text)
+    assigned_technician_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
+    scheduled_on: Mapped[date | None] = mapped_column(Date)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    work_performed: Mapped[str | None] = mapped_column(Text)
+    completion_notes: Mapped[str | None] = mapped_column(Text)
+    cancel_reason: Mapped[str | None] = mapped_column(String(255))
+    created_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    completed_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+    equipment: Mapped[Equipment] = relationship()
+    breakdown: Mapped[Breakdown | None] = relationship()
+    assigned_technician: Mapped[User | None] = relationship(foreign_keys=[assigned_technician_id])
+    created_by: Mapped[User | None] = relationship(foreign_keys=[created_by_id])
+    completed_by: Mapped[User | None] = relationship(foreign_keys=[completed_by_id])
+
+
+class WorkOrderEvent(Base):
+    """Status history and audit trail of a work order (append-only)."""
+
+    __tablename__ = "work_order_events"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    work_order_id: Mapped[int] = mapped_column(
+        ForeignKey("work_orders.id", ondelete="CASCADE"), index=True
+    )
+    occurred_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    from_status: Mapped[str | None] = mapped_column(String(32))
+    to_status: Mapped[str | None] = mapped_column(String(32))
+    summary: Mapped[str] = mapped_column(String(255))
+    note: Mapped[str | None] = mapped_column(Text)
+    actor_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+
+    actor: Mapped[User | None] = relationship()

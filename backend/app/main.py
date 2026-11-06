@@ -19,6 +19,7 @@ from .routers import (
     maintenance,
     maintenance_equipment,
     maintenance_pm,
+    maintenance_work,
     reports,
     system,
     users,
@@ -66,7 +67,7 @@ def create_app() -> FastAPI:
     ):
         app.include_router(module.router, dependencies=LOGISTICS)
     # Maintenance Operations
-    for module in (maintenance, maintenance_equipment, maintenance_pm):
+    for module in (maintenance, maintenance_equipment, maintenance_pm, maintenance_work):
         app.include_router(module.router, dependencies=MAINTENANCE)
     return app
 

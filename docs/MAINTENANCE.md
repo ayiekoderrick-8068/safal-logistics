@@ -10,7 +10,7 @@ design; it is updated as each milestone lands.
 | 1 — Foundation | Workspace chooser, maintenance sign-in, workspace-bound sessions, password re-authentication, maintenance roles | Done |
 | 2 — Equipment | Equipment register, details, maintenance history | Done |
 | 3 — Scheduling | Preventive-maintenance plans, recurring tasks, overdue flags | Done |
-| 4 — Work orders | Work-order lifecycle, breakdown tracking, repair records | Planned |
+| 4 — Work orders | Work-order lifecycle, breakdown tracking, repair records | Done |
 | 5 — Spare parts | Inventory, consumption, reorder alerts | Planned |
 | 6 — Analytics | Dashboard KPIs, MTTR, MTBF, PM compliance, availability, exports | Planned |
 | 7 — Quality | End-to-end, security and responsive testing; documentation | Planned |
@@ -134,7 +134,67 @@ upcoming, open, completed, cancelled, all; `mine`, `equipment_id`, `technician_i
 `within_days`), `PATCH /tasks/{id}`, `POST /tasks/{id}/complete|cancel`. Every change is added
 to the equipment history and the audit log.
 
+## Work orders and breakdowns (Milestone 4)
+
+Tables `work_orders`, `work_order_events`, `breakdowns`; rules in
+`backend/app/services/workorders.py`. Numbers come from database sequences
+(`WO-2026-00001`, `BD-2026-00001`); they are never reused and may have gaps.
+
+**Lifecycle** (anything else is refused with 409; also enforced by CHECK constraints):
+
+| From | Allowed next |
+|---|---|
+| Open | Assigned (by assigning a technician), Cancelled |
+| Assigned | In progress, Open (by unassigning), Cancelled |
+| In progress | Awaiting parts, Completed, Cancelled |
+| Awaiting parts | In progress, Cancelled |
+| Completed / Cancelled | — (final) |
+
+* **Completing** requires that work started, an assigned technician, the *work performed*
+  (≥ 10 characters), and a completion time not in the future and not before the start. Forms
+  enter times to the minute, so a time within the start's own minute is clamped to the start.
+* **Cancelling** needs a reason and `work_orders.assign`. Started work cannot be unassigned,
+  only reassigned.
+* **Technicians** may start, pause, resume and complete only work orders assigned to them; they
+  can raise work orders and assign them to themselves. Planners and managers can act on any.
+* Every transition and assignment is appended to `work_order_events` (who, when, from → to,
+  note) and the audit log; completions and cancellations also go into the equipment history.
+* Completing and transitioning lock the row; a concurrent second completion gets 409 (tested
+  with two simultaneous sessions).
+* **Repair duration** = start to completion, including time awaiting parts.
+* **Parts consumed** are recorded against work orders by the spare-parts module (Milestone 5).
+
+**Breakdowns**
+
+* A breakdown runs from the failure start to restoration (`restored_at`), with severity, fault
+  category, description, possible cause and actions taken. Times cannot be in the future.
+* **No double counting.** An asset has at most one open breakdown (partial unique index), and
+  a new breakdown cannot start before the previous one of the same asset was restored. Periods
+  of one asset therefore never overlap, so summed downtime is exact.
+* **Downtime** counts only failures that stopped the asset (`equipment_down`); an open
+  breakdown counts up to now. Summaries clip each breakdown to the reporting window.
+* Logging a breakdown can raise a corrective work order whose priority follows the severity
+  (critical → critical, major → high, minor → medium). Completing that work order can also
+  record the restoration at the completion time.
+* **Recurring failures:** the summary ranks equipment by breakdowns in the last 90 days, counts
+  assets with two or more, and totals breakdowns and downtime per fault category.
+
+**Equipment status follows the work** (each automatic change is written to the equipment
+history): a breakdown that stops the asset → out of service; starting work → under
+maintenance (unless out of service); restoration or the end of the last active work order →
+operational again when nothing else holds it down. Archiving is refused while the asset has
+open work orders or an open breakdown.
+
+API under `/api/maintenance`: `GET /work-orders` (status, active, overdue, priority, mine,
+equipment, search), `GET /work-orders/summary`, `GET /work-orders/{id}` (with history),
+`POST /work-orders`, `PATCH /work-orders/{id}`, `POST /work-orders/{id}/transition`,
+`POST /work-orders/{id}/complete`; `GET /breakdowns`, `GET /breakdowns/summary?days=`,
+`POST /breakdowns`, `PATCH /breakdowns/{id}`, `POST /breakdowns/{id}/restore`.
+
 ## Migrations
+
+`e6a0c3d4f5b7` creates the work-order, work-order-event and breakdown tables and two number
+sequences (new objects only).
 
 `d5f9b2c3e4a6` creates the plan and task tables and drops the equipment
 `next_service_after_last` CHECK (see above). Its downgrade restores the CHECK after clearing

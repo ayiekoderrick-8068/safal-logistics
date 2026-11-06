@@ -21,6 +21,7 @@ from ..deps import require_maintenance
 from ..maintenance_permissions import MaintenancePermission as P
 from ..models import MaintenanceRole, Role, User, UserStatus
 from ..models_maintenance import (
+    Breakdown,
     Equipment,
     EquipmentCategory,
     EquipmentEvent,
@@ -28,6 +29,8 @@ from ..models_maintenance import (
     MaintenancePlan,
     MaintenanceTask,
     TaskStatus,
+    WorkOrder,
+    WorkOrderStatus,
 )
 from ..schemas_maintenance import (
     EquipmentDetail,
@@ -434,6 +437,23 @@ def archive_equipment(
     eq = _get(db, equipment_id)
     if eq.archived_at is not None:
         raise conflict("This equipment is already archived.")
+    # Repairs in flight are never silently cancelled: finish or cancel them first.
+    open_work = db.scalar(
+        select(func.count(WorkOrder.id)).where(
+            WorkOrder.equipment_id == eq.id,
+            WorkOrder.status.not_in((WorkOrderStatus.COMPLETED, WorkOrderStatus.CANCELLED)),
+        )
+    )
+    open_breakdown = db.scalar(
+        select(func.count(Breakdown.id)).where(
+            Breakdown.equipment_id == eq.id, Breakdown.restored_at.is_(None)
+        )
+    )
+    if open_work or open_breakdown:
+        raise conflict(
+            f"{eq.code} has {open_work} open work order(s) and {open_breakdown} open "
+            "breakdown(s). Complete or cancel them before archiving."
+        )
     eq.archived_at = utcnow()
     eq.archived_by_id = user.id
     reason = " ".join(body.reason.split())

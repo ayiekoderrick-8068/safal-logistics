@@ -54,10 +54,11 @@ describe('equipment register', () => {
     setup(['view'])
     // First render also loads the lazy page chunk (slow under a full parallel test run).
     expect(await screen.findByRole('heading', { name: 'Equipment Register' }, { timeout: 8000 })).toBeInTheDocument()
-    const overdue = await screen.findByRole('article', { name: 'Service Overdue' })
+    const slow = { timeout: 8000 } // several requests resolve after the page chunk loads
+    const overdue = await screen.findByRole('article', { name: 'Service Overdue' }, slow)
     expect(within(overdue).getByTestId('stat-value')).toHaveTextContent('1')
-    expect((await screen.findAllByText('5 days overdue')).length).toBeGreaterThan(0)
-    expect(await screen.findByRole('list', { name: 'Maintenance history' })).toHaveTextContent('CMP-002 registered')
+    expect((await screen.findAllByText('5 days overdue', {}, slow)).length).toBeGreaterThan(0)
+    expect(await screen.findByRole('list', { name: 'Maintenance history' }, slow)).toHaveTextContent('CMP-002 registered')
     // Read-only role: no management actions offered.
     expect(screen.queryByRole('button', { name: /Add Equipment/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()

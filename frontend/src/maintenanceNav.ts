@@ -39,18 +39,10 @@ export const MAINTENANCE_NAV: NavSection[] = [
       {
         to: '/maintenance/work-orders', label: 'Work Orders', title: 'Work Orders', icon: ClipboardList,
         description: 'Plan, assign and complete maintenance work.',
-        planned: {
-          milestone: 'Milestone 4',
-          features: ['Work-order lifecycle with status history', 'Validated completion with work performed'],
-        },
       },
       {
         to: '/maintenance/breakdowns', label: 'Breakdown Logs', title: 'Breakdown Logs', icon: TriangleAlert,
         description: 'Record failures, downtime and repairs.',
-        planned: {
-          milestone: 'Milestone 4',
-          features: ['Breakdown start and restoration times', 'Downtime and recurring-failure analysis'],
-        },
       },
       {
         to: '/maintenance/spare-parts', label: 'Spare Parts', title: 'Spare Parts Inventory', icon: Package,
