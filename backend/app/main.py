@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
 from .config import get_settings
+from .middleware import SecurityHeadersMiddleware
 from .routers import (
     alerts,
     analytics,
@@ -21,10 +22,14 @@ from .routers import (
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    docs = settings.docs_enabled
     app = FastAPI(
         title="LogiTrack API",
         version=__version__,
         description="Logistics operations API: fleet, bays, dispatch and turnaround analytics.",
+        docs_url="/docs" if docs else None,
+        redoc_url=None,
+        openapi_url="/openapi.json" if docs else None,
     )
     app.add_middleware(
         CORSMiddleware,
@@ -33,6 +38,7 @@ def create_app() -> FastAPI:
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Content-Type", "Authorization"],
     )
+    app.add_middleware(SecurityHeadersMiddleware)  # outermost: also covers CORS/413 replies
     app.include_router(system.router)
     app.include_router(auth.router)
     app.include_router(dashboard.router)

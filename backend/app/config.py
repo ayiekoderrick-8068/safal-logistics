@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 from zoneinfo import ZoneInfo
 
 from pydantic import Field, model_validator
@@ -15,6 +16,11 @@ class Settings(BaseSettings):
         env_file=(".env", "../.env"),
         extra="ignore",
     )
+
+    # "production" turns on fail-fast checks for insecure settings and hides the API docs.
+    environment: Literal["development", "test", "production"] = "development"
+    # Interactive API docs (/docs, /openapi.json). Default: on, except in production.
+    api_docs: bool | None = None
 
     database_url: str
     test_database_url: str | None = None
@@ -57,6 +63,32 @@ class Settings(BaseSettings):
             url = make_url(self.database_url).set(database=self.database_name)
             self.database_url = url.render_as_string(hide_password=False)
         return self
+
+    @model_validator(mode="after")
+    def _check_security(self) -> Settings:
+        if "*" in self.cors_origins:
+            # Browsers reject a wildcard with credentials; never allow it.
+            raise ValueError("LOGITRACK_CORS_ORIGINS must list explicit origins, not '*'.")
+        if self.environment != "production":
+            return self
+        problems = []
+        if not self.cookie_secure:
+            problems.append("LOGITRACK_COOKIE_SECURE must be true (HTTPS only cookies)")
+        if "change-me" in self.jwt_secret.lower() or len(set(self.jwt_secret)) < 16:
+            problems.append("LOGITRACK_JWT_SECRET must be a long random value")
+        if any("localhost" in o or "127.0.0.1" in o for o in self.cors_origins):
+            problems.append("LOGITRACK_CORS_ORIGINS must not include localhost")
+        if any(o.startswith("http://") for o in self.cors_origins):
+            problems.append("LOGITRACK_CORS_ORIGINS must use https:// origins")
+        if "change-me" in self.database_url:
+            problems.append("LOGITRACK_DATABASE_URL still contains a placeholder password")
+        if problems:
+            raise ValueError("Unsafe production configuration: " + "; ".join(problems))
+        return self
+
+    @property
+    def docs_enabled(self) -> bool:
+        return self.api_docs if self.api_docs is not None else self.environment != "production"
 
     @property
     def tz(self) -> ZoneInfo:
