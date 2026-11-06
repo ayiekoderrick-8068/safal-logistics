@@ -38,6 +38,15 @@ describe('login flow', () => {
     expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
   })
 
+  it('exposes the complete headline and keeps the hero photo decorative', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(401, { detail: 'Not authenticated' }))
+    const { container } = renderAt('/login')
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent(
+      'Faster loading. Reliable dispatch. Measurable turnaround.',
+    )
+    expect(container.querySelector('picture img')).toHaveAttribute('alt', '')
+  })
+
   it('validates required fields before calling the API', async () => {
     fetchMock.mockResolvedValue(jsonResponse(401, { detail: 'Not authenticated' }))
     renderAt('/login')

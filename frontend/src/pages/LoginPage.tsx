@@ -13,11 +13,15 @@ import {
   TriangleAlert,
   Warehouse,
 } from 'lucide-react'
-import { useEffect, useState, type KeyboardEvent } from 'react'
+import { useEffect, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { useForm } from 'react-hook-form'
 import { Navigate, useLocation, useNavigate } from 'react-router'
 import { z } from 'zod'
+import fleetJpg from '../assets/login/fleet-highway.jpg'
+import fleet480 from '../assets/login/fleet-highway-480.webp'
+import fleet736 from '../assets/login/fleet-highway-736.webp'
 import { useAuth } from '../auth/context'
+import TextType from '../components/reactbits/TextType/TextType'
 import { ApiError } from '../lib/api'
 
 const schema = z.object({
@@ -42,21 +46,126 @@ function formatCountdown(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-/** Decorative route illustration (no data). */
-function RouteArt() {
+const HEADLINE = ['Faster loading.', 'Reliable dispatch.', 'Measurable turnaround.']
+// White, white, cyan-300: the same colour mapping as the original static headline.
+const HEADLINE_COLORS = ['#ffffff', '#ffffff', '#67e8f9']
+
+const REDUCED_MOTION = '(prefers-reduced-motion: reduce)'
+function subscribeReducedMotion(onChange: () => void) {
+  if (typeof window.matchMedia !== 'function') return () => {}
+  const query = window.matchMedia(REDUCED_MOTION)
+  query.addEventListener('change', onChange)
+  return () => query.removeEventListener('change', onChange)
+}
+// Without matchMedia (e.g. jsdom) we can't know the preference, so fall back to the static headline.
+const prefersReducedMotion = () => typeof window.matchMedia !== 'function' || window.matchMedia(REDUCED_MOTION).matches
+
+/**
+ * Typed headline. Its height is reserved for two lines so the cycling text never moves the
+ * layout, and screen readers get all three phrases at once. Reduced-motion users see the
+ * full static headline instead.
+ */
+function Headline() {
+  const reduced = useSyncExternalStore(subscribeReducedMotion, prefersReducedMotion, () => true)
+  const size = 'leading-tight font-bold sm:text-4xl lg:text-[2.75rem] xl:text-5xl'
+
+  if (reduced) {
+    // All three phrases at once: smaller on phones so the static line doesn't cover the photo.
+    return (
+      <h1 className={`mt-4 text-xl lg:mt-5 ${size}`}>
+        <span className="lg:block">Faster loading.</span> <span className="lg:block">Reliable dispatch.</span>{' '}
+        <span className="text-cyan-300 lg:block">Measurable turnaround.</span>
+      </h1>
+    )
+  }
   return (
-    <svg viewBox="0 0 520 180" className="w-full max-w-xl text-cyan-200/70" aria-hidden>
-      <path d="M10 150 C120 150 140 60 260 60 S420 140 510 40" fill="none" stroke="currentColor" strokeWidth="3"
-        strokeDasharray="10 10" strokeLinecap="round" />
-      <circle cx="10" cy="150" r="9" className="fill-cyan-300" />
-      <circle cx="510" cy="40" r="9" className="fill-emerald-300" />
-      <g transform="translate(218 22)" className="text-white">
-        <rect x="0" y="10" width="58" height="34" rx="5" className="fill-white/90" />
-        <path d="M58 20 h18 l12 12 v12 h-30z" className="fill-cyan-300" />
-        <circle cx="16" cy="48" r="7" className="fill-sidebar stroke-white" strokeWidth="3" />
-        <circle cx="70" cy="48" r="7" className="fill-sidebar stroke-white" strokeWidth="3" />
-      </g>
-    </svg>
+    <h1 className={`mt-4 text-[1.65rem] lg:mt-5 ${size}`}>
+      <span className="block min-h-[2.5em]">
+        <TextType
+          as="span"
+          text={HEADLINE}
+          textColors={HEADLINE_COLORS}
+          typingSpeed={65}
+          pauseDuration={2000}
+          deletingSpeed={35}
+          deleteMode="backspace"
+          typeEffect="fade"
+          mistakes={0}
+          cursorStyle="bar"
+          cursorColor="#42E6F2"
+          cursorGlide
+          showCursor
+          loop
+        />
+      </span>
+    </h1>
+  )
+}
+
+function Brand() {
+  return (
+    <div className="flex items-center gap-3 px-3.5 sm:px-4 lg:px-5">
+      <span className="grid size-11 place-items-center rounded-xl bg-gradient-to-br from-cyan-300 to-accent text-sidebar shadow-lg shadow-cyan-500/20 lg:size-14 lg:rounded-2xl">
+        <Truck className="size-6 lg:size-8" strokeWidth={2.2} aria-hidden />
+      </span>
+      <div>
+        <p className="text-xl leading-tight font-bold lg:text-2xl">LogiTrack</p>
+        <p className="text-sm text-white/75 lg:text-base">Operations Portal</p>
+      </div>
+    </div>
+  )
+}
+
+/** Brand hero: fleet photograph under a dark-teal wash, headline above the trucks, highlights over the road. */
+function Hero() {
+  return (
+    <section className="relative isolate flex h-80 flex-col overflow-hidden bg-sidebar-deep pt-3.5 text-white sm:h-[27rem] sm:pt-4 lg:h-auto lg:pt-5 lg:pb-10">
+      <picture>
+        <source type="image/webp" srcSet={`${fleet480} 480w, ${fleet736} 736w`} sizes="(min-width: 1024px) 53vw, 100vw" />
+        <img
+          src={fleetJpg}
+          width={736}
+          height={1051}
+          alt=""
+          decoding="async"
+          fetchPriority="high"
+          className="absolute inset-0 -z-20 size-full object-cover object-[center_34%] sm:object-[center_40%] lg:object-[center_80%]"
+        />
+      </picture>
+      {/* Teal tint so the photo sits in the brand palette, then a vertical wash for text contrast. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-sidebar/25 mix-blend-multiply" />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-sidebar-deep/90 via-sidebar-deep/30 via-55% to-sidebar-deep/55 lg:from-sidebar-deep/90 lg:via-sidebar-deep/15 lg:via-45% lg:to-sidebar-deep/95"
+      />
+
+      {/* Brand sits in the corner; the rest keeps the original content inset. */}
+      <Brand />
+
+      <div className="flex flex-1 flex-col px-5 sm:px-10 lg:px-12 xl:px-16">
+        <div className="mt-2.5 max-w-xl sm:mt-6 lg:mt-11">
+          <p className="mt-5 hidden items-center rounded-full border border-white/15 bg-sidebar-deep/40 px-3 py-1 text-xs font-semibold tracking-wide text-cyan-200 uppercase sm:inline-flex">
+            Logistics operations
+          </p>
+          <Headline />
+        </div>
+
+        <div className="mt-auto hidden lg:block">
+          <ul className="grid grid-cols-2 gap-3">
+            {HIGHLIGHTS.map(({ icon: Icon, title, text }) => (
+              <li key={title} className="rounded-2xl border border-white/10 bg-sidebar-deep/70 px-4 py-3.5 backdrop-blur-sm">
+                <p className="flex items-center gap-2 font-semibold">
+                  <Icon className="size-4.5 text-cyan-300" aria-hidden />
+                  {title}
+                </p>
+                <p className="mt-1 text-sm text-white/70">{text}</p>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-6 text-xs text-white/55">© {YEAR} LogiTrack · Logistics Operations</p>
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -119,56 +228,13 @@ export function LoginPage() {
     'h-12 w-full rounded-xl border border-slate-300 bg-white px-4 text-ink shadow-sm transition focus:border-accent focus:ring-4 focus:ring-accent/20 focus:outline-none aria-invalid:border-red-400 aria-invalid:ring-red-100 disabled:bg-slate-50'
 
   return (
-    <div className="grid min-h-screen bg-sidebar-deep lg:grid-cols-[1.1fr_1fr]">
-      {/* Brand panel */}
-      <section className="sidebar-gradient relative hidden flex-col overflow-hidden px-12 py-10 text-white lg:flex xl:px-16">
-        <div className="pointer-events-none absolute -top-40 -right-40 size-[28rem] rounded-full bg-accent/15 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-32 -left-24 size-96 rounded-full bg-cyan-400/10 blur-3xl" />
-        <div className="relative flex items-center gap-3">
-          <span className="grid size-14 place-items-center rounded-2xl bg-gradient-to-br from-cyan-300 to-accent text-sidebar shadow-lg shadow-cyan-500/20">
-            <Truck className="size-8" strokeWidth={2.2} aria-hidden />
-          </span>
-          <div>
-            <p className="text-2xl leading-tight font-bold">LogiTrack</p>
-            <p className="text-white/75">Operations Portal</p>
-          </div>
-        </div>
-
-        <div className="relative my-auto max-w-xl py-10">
-          <p className="mb-3 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold tracking-wide text-cyan-200 uppercase">
-            Logistics operations
-          </p>
-          <h1 className="text-4xl leading-tight font-bold xl:text-5xl">
-            Faster loading.<br />Reliable dispatch.<br /><span className="text-cyan-300">Measurable turnaround.</span>
-          </h1>
-          <div className="mt-8"><RouteArt /></div>
-          <ul className="mt-8 grid grid-cols-2 gap-3">
-            {HIGHLIGHTS.map(({ icon: Icon, title, text }) => (
-              <li key={title} className="rounded-2xl border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
-                <Icon className="mb-2 size-5 text-cyan-300" aria-hidden />
-                <p className="font-semibold">{title}</p>
-                <p className="text-sm text-white/70">{text}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-        <p className="relative text-xs text-white/50">© {YEAR} LogiTrack · Logistics Operations</p>
-      </section>
+    <div className="flex min-h-screen flex-col bg-sidebar-deep lg:grid lg:grid-cols-[1.1fr_1fr]">
+      <Hero />
 
       {/* Sign-in panel */}
-      <section className="workspace-gradient flex items-center justify-center px-5 py-10 lg:rounded-l-[32px]">
+      <section className="workspace-gradient relative z-10 -mt-6 flex flex-1 items-start justify-center rounded-t-[28px] px-5 pt-8 pb-8 sm:items-center lg:mt-0 lg:items-center lg:rounded-t-none lg:rounded-l-[32px] lg:py-10">
         <div className="w-full max-w-md">
-          <div className="mb-6 flex items-center gap-3 lg:hidden">
-            <span className="grid size-12 place-items-center rounded-xl bg-gradient-to-br from-cyan-300 to-accent text-sidebar">
-              <Truck className="size-7" aria-hidden />
-            </span>
-            <div>
-              <p className="text-xl leading-tight font-bold text-ink">LogiTrack</p>
-              <p className="text-sm text-ink-muted">Operations Portal</p>
-            </div>
-          </div>
-
-          <div className="card p-8 sm:p-10">
+          <div className="card p-7 sm:p-10">
             <span className="mb-4 grid size-12 place-items-center rounded-2xl bg-sky-100 text-primary">
               <LockKeyhole className="size-6" aria-hidden />
             </span>
