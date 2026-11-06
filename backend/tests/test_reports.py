@@ -254,6 +254,31 @@ def test_combined_filters(auth_client, ids, extra, loads) -> None:
     assert body["kpis"]["loads_processed"] == loads
 
 
+@pytest.mark.parametrize(
+    "extra",
+    [
+        {},
+        {"truck_id": "t1"},
+        {"driver_id": "d2"},
+        {"bay_id": "b2"},
+        {"route_id": "r1"},
+        {"dispatch_status": "delayed"},
+        {"delay_cause": DelayCause.TRAFFIC},
+    ],
+)
+@pytest.mark.parametrize("anchor", ["departed", "scheduled", "occupancy"])
+def test_lean_load_query_matches_full_query(db, ids, extra, anchor) -> None:
+    """The performance-oriented lean query must select exactly the same bookings."""
+    from app.services.reporting import ReportFilters, load_query
+
+    kw = {k: (ids[v] if isinstance(v, str) and v in ids else v) for k, v in extra.items()}
+    f = ReportFilters(start=DAY - timedelta(days=1), end=DAY, preset="custom", **kw)
+    full = [r.schedule_id for r in db.execute(load_query(f, anchor))]
+    lean = [r.schedule_id for r in db.execute(load_query(f, anchor, lean=True))]
+    assert sorted(full) == sorted(lean)
+    assert len(lean) == len(set(lean))  # never duplicated
+
+
 def test_delay_analysis_counts_each_incident_once(auth_client, ids) -> None:
     d = auth_client.get(f"/api/reports/delays?{Q}").json()
     assert d["total"] == 3 and d["open"] == 2 and d["resolved"] == 1

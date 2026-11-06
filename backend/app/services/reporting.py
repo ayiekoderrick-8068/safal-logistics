@@ -232,11 +232,28 @@ def _driver_was_assigned(driver_id: int, truck_col, at_col):
     )
 
 
-def load_query(f: ReportFilters, anchor: Literal["departed", "scheduled", "occupancy"]) -> Select:
-    """One row per loading booking (with its dispatch, if any), filtered consistently."""
+def load_query(
+    f: ReportFilters,
+    anchor: Literal["departed", "scheduled", "occupancy"],
+    lean: bool = False,
+) -> Select:
+    """One row per loading booking (with its dispatch, if any), filtered consistently.
+
+    ``lean=True`` returns only id, bay and timestamps for occupancy maths. It skips the
+    display joins (truck, bay, driver, route), none of which can change the row set:
+    truck and bay are non-null foreign keys, the route join is an outer join, and at most
+    one driver assignment covers any moment (exclusion constraint). Filters are identical.
+    """
     s, e = f.bounds()
     S, D = LoadingSchedule, DispatchAlias
     op_time = func.coalesce(S.arrival_at, S.scheduled_start)
+    if lean:
+        q = (
+            select(S.id.label("schedule_id"), S.bay_id, S.arrival_at, S.departed_at)
+            .outerjoin(D, D.schedule_id == S.id)
+            .where(S.status != ScheduleStatus.CANCELLED)
+        )
+        return _load_filters(q, f, anchor, s, e, op_time, D)
     DA, da_cond = _assignment_at(S.truck_id, op_time)
     Dr = aliased(Driver)
     q = (
@@ -274,6 +291,11 @@ def load_query(f: ReportFilters, anchor: Literal["departed", "scheduled", "occup
         .outerjoin(Route, Route.id == D.route_id)
         .where(S.status != ScheduleStatus.CANCELLED)
     )
+    return _load_filters(q, f, anchor, s, e, op_time, D)
+
+
+def _load_filters(q: Select, f: ReportFilters, anchor: str, s, e, op_time, D) -> Select:
+    S = LoadingSchedule
     if anchor == "departed":
         q = q.where(S.departed_at >= s, S.departed_at < e, S.arrival_at.is_not(None))
     elif anchor == "scheduled":
@@ -487,11 +509,13 @@ class Context:
         return r.get("bay_target") or self.target
 
 
-def _occupancy_by_bay(ctx: Context) -> dict[int, float]:
+def _occupancy_by_bay(ctx: Context, occupancy_rows: list[Any] | None = None) -> dict[int, float]:
     s, e = ctx.f.bounds()
     end_cap = min(e, ctx.now)
     occ: dict[int, float] = defaultdict(float)
-    for r in rows(ctx.db, load_query(ctx.f, "occupancy")):
+    if occupancy_rows is None:
+        occupancy_rows = rows(ctx.db, load_query(ctx.f, "occupancy", lean=True))
+    for r in occupancy_rows:
         start = max(r["arrival_at"], s)
         stop = min(r["departed_at"] or end_cap, e)
         if stop > start:
@@ -542,21 +566,21 @@ def summary_report(db: Session, f: ReportFilters, hours_per_day: int) -> dict[st
     incidents = rows(db, incident_query(f))
     outcomes = Counter(delivery_outcome(d) for d in dispatches)
     completed = outcomes["on_time"] + outcomes["late"]
-    turnarounds = [t for r in loads if (t := load_durations(r)["turnaround"]) is not None]
+    # Yard turnaround per load, computed once (same definition as load_durations()).
+    ta = [minutes(r["arrival_at"], r["departed_at"]) for r in loads]
+    turnarounds = [t for t in ta if t is not None]
     delayed_loads = sum(
         1
-        for r in loads
-        if (load_durations(r)["turnaround"] or 0) > ctx.target_for(r)
-        or delivery_outcome(r) == "late"
-        or r["is_delayed"]
+        for r, t in zip(loads, ta, strict=True)
+        if (t or 0) > ctx.target_for(r) or delivery_outcome(r) == "late" or r["is_delayed"]
     )
     bays = _active_bays(ctx)
     occ = _occupancy_by_bay(ctx)
     occupied = sum(occ.get(b.id, 0.0) for b in bays)
 
     by_day_loads: dict[date, list[float]] = defaultdict(list)
-    for r in loads:
-        if (t := load_durations(r)["turnaround"]) is not None:
+    for r, t in zip(loads, ta, strict=True):
+        if t is not None:
             by_day_loads[local_day(r["departed_at"])].append(t)
     by_day_disp: dict[date, Counter] = defaultdict(Counter)
     for d in dispatches:
@@ -657,7 +681,8 @@ def turnaround_report(db: Session, f: ReportFilters) -> dict[str, Any]:
             )
         return sorted(out, key=lambda x: -(x["avg_minutes"] or 0))
 
-    ongoing = sum(1 for r in rows(db, load_query(f, "occupancy")) if r["departed_at"] is None)
+    on_site = load_query(f, "occupancy", lean=True).where(LoadingSchedule.departed_at.is_(None))
+    ongoing = db.scalar(select(func.count()).select_from(on_site.subquery())) or 0
     return {
         "target_minutes": ctx.target,
         "completed_loads": len(loads),
@@ -771,22 +796,27 @@ def incident_record(i: Any, now: datetime) -> dict[str, Any]:
 def bay_report(db: Session, f: ReportFilters, hours_per_day: int) -> dict[str, Any]:
     ctx = Context(db, f)
     loads = rows(db, load_query(f, "departed"))
-    occ = _occupancy_by_bay(ctx)
+    arrivals = rows(db, load_query(f, "occupancy", lean=True))  # fetched once, reused
+    occ = _occupancy_by_bay(ctx, arrivals)
     tz = get_settings().tz
-    arrivals = rows(db, load_query(f, "occupancy"))
     s, _ = f.bounds()
-    peak = Counter(r["arrival_at"].astimezone(tz).hour for r in arrivals if r["arrival_at"] >= s)
+    durs_by_bay: dict[int, list[dict[str, float | None]]] = defaultdict(list)
+    for r in loads:
+        durs_by_bay[r["bay_id"]].append(load_durations(r))
+    peak: Counter[int] = Counter()
+    peak_by_bay: dict[int, Counter[int]] = defaultdict(Counter)
+    for r in arrivals:
+        if r["arrival_at"] >= s:
+            hour = r["arrival_at"].astimezone(tz).hour
+            peak[hour] += 1
+            peak_by_bay[r["bay_id"]][hour] += 1
     out = []
     for bay in _active_bays(ctx):
-        items = [r for r in loads if r["bay_id"] == bay.id]
-        durs = [load_durations(r) for r in items]
+        durs = durs_by_bay.get(bay.id, [])
+        items = durs  # one entry per load in this bay
         target = bay.target_turnaround_minutes or ctx.target
         delayed = sum(1 for d in durs if (d["turnaround"] or 0) > target)
-        bay_peak = Counter(
-            r["arrival_at"].astimezone(tz).hour
-            for r in arrivals
-            if r["bay_id"] == bay.id and r["arrival_at"] >= s
-        )
+        bay_peak = peak_by_bay.get(bay.id, Counter())
         out.append(
             {
                 "id": bay.id,
