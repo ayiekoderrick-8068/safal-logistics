@@ -67,9 +67,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user],
   )
 
+  // After a password change the server returns the updated account.
+  const updateUser = useCallback((u: User) => setUser(u), [])
+
   const value = useMemo(
-    () => ({ status, user, sessionExpired, login, logout, hasRole }),
-    [status, user, sessionExpired, login, logout, hasRole],
+    () => ({ status, user, sessionExpired, login, logout, hasRole, updateUser }),
+    [status, user, sessionExpired, login, logout, hasRole, updateUser],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

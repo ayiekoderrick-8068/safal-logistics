@@ -8,6 +8,14 @@ export interface User {
   role: Role
   status: 'active' | 'pending' | 'deactivated'
   last_login_at: string | null
+  /** Set after an administrator issues a temporary password. */
+  must_change_password?: boolean
+}
+
+/** User as seen by administrators on the User Management page. */
+export interface AdminUser extends User {
+  created_at: string
+  password_changed_at: string | null
 }
 
 export interface Meta {

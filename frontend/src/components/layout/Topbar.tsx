@@ -1,16 +1,26 @@
-import { ChevronDown, LogOut, Menu, Search } from 'lucide-react'
+import { ChevronDown, KeyRound, LogOut, Menu, Search } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { useAuth } from '../../auth/context'
+import { ChangePasswordModal } from '../account/ChangePasswordModal'
+import { useToast } from '../ui/toastContext'
 import { initials, ROLE_LABELS } from '../../lib/format'
 import { ALL_NAV_ITEMS } from '../../nav'
 import { NotificationBell } from './NotificationBell'
 
 export function Topbar({ onToggleNav }: { onToggleNav: () => void }) {
-  const { user, logout, hasRole } = useAuth()
+  const { user, logout, hasRole, updateUser } = useAuth()
   const navigate = useNavigate()
+  const toast = useToast()
   const [query, setQuery] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
+  const signOut = async () => {
+    await logout()
+    navigate('/login', { replace: true })
+  }
+  // A temporary password issued by an administrator must be replaced before continuing.
+  const mustChange = !!user?.must_change_password
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -101,12 +111,22 @@ export function Topbar({ onToggleNav }: { onToggleNav: () => void }) {
               <button
                 type="button"
                 role="menuitem"
-                onClick={async () => {
+                onClick={() => {
                   setMenuOpen(false)
-                  await logout()
-                  navigate('/login', { replace: true })
+                  setChangingPassword(true)
                 }}
                 className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-muted"
+              >
+                <KeyRound className="size-4" aria-hidden /> Change password
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={async () => {
+                  setMenuOpen(false)
+                  await signOut()
+                }}
+                className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-muted"
               >
                 <LogOut className="size-4" aria-hidden /> Sign out
               </button>
@@ -114,6 +134,18 @@ export function Topbar({ onToggleNav }: { onToggleNav: () => void }) {
           )}
         </div>
       </div>
+      {(changingPassword || mustChange) && (
+        <ChangePasswordModal
+          required={mustChange}
+          onClose={() => setChangingPassword(false)}
+          onSignOut={signOut}
+          onChanged={(u) => {
+            setChangingPassword(false)
+            updateUser(u)
+            toast.success('Password changed. Other devices have been signed out.')
+          }}
+        />
+      )}
     </header>
   )
 }

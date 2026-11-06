@@ -112,14 +112,6 @@ export const NAV: NavSection[] = [
       {
         to: '/users', label: 'User Management', title: 'User Management', icon: Users, roles: ['admin'],
         description: 'Manage system users, roles and access permissions.',
-        planned: {
-          milestone: 'Milestone 5',
-          features: [
-            'Create, edit, activate and deactivate users',
-            'Administrator, Operations, Fleet Manager, Compliance and Viewer roles',
-            'Role-based permissions (already enforced by the API)',
-          ],
-        },
       },
       {
         to: '/activity-log', label: 'Activity Log', title: 'Activity Log', icon: Activity, roles: ['admin'],

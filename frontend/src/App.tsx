@@ -24,12 +24,19 @@ const TurnaroundAnalyticsPage = lazy(() =>
 const ReportsPage = lazy(() => import('./pages/reports/ReportsPage').then((m) => ({ default: m.ReportsPage })))
 const AlertsPage = lazy(() => import('./pages/alerts/AlertsPage').then((m) => ({ default: m.AlertsPage })))
 const DelayReportsPage = lazy(() => import('./pages/delays/DelayReportsPage').then((m) => ({ default: m.DelayReportsPage })))
+const UsersPage = lazy(() => import('./pages/users/UsersPage').then((m) => ({ default: m.UsersPage })))
 const ComplianceRecordsPage = lazy(() =>
   import('./pages/compliance/ComplianceRecordsPage').then((m) => ({ default: m.ComplianceRecordsPage })),
 )
 
 function Lazy({ children }: { children: ReactNode }) {
   return <Suspense fallback={<LoadingState label="Loading…" />}>{children}</Suspense>
+}
+
+/** Hides administrator pages from other roles (the API enforces this independently). */
+function AdminOnly({ children }: { children: ReactNode }) {
+  const { hasRole } = useAuth()
+  return hasRole() ? <>{children}</> : <NotFoundPage forbidden />
 }
 
 function ModuleRoute({ item }: { item: NavItem }) {
@@ -58,6 +65,7 @@ export function AppRoutes() {
         <Route path="alerts" element={<Lazy><AlertsPage /></Lazy>} />
         <Route path="reports" element={<Lazy><ReportsPage /></Lazy>} />
         <Route path="turnaround" element={<Lazy><TurnaroundAnalyticsPage /></Lazy>} />
+        <Route path="users" element={<AdminOnly><Lazy><UsersPage /></Lazy></AdminOnly>} />
         {ALL_NAV_ITEMS.filter((i) => i.planned).map((item) => (
           <Route key={item.to} path={item.to.slice(1)} element={<ModuleRoute item={item} />} />
         ))}
