@@ -107,6 +107,17 @@ def test_xlsx_filters_and_history(auth_client, ids, db) -> None:  # noqa: F811
     assert auth_client.get("/api/reports/export/nope.xlsx").status_code == 404
 
 
+def test_xlsx_row_limit_is_refused_with_guidance(auth_client, ids, db, monkeypatch) -> None:  # noqa: F811
+    monkeypatch.setattr("app.services.exports.XLSX_MAX_ROWS", 1)
+    r = auth_client.get(f"/api/reports/export/turnaround.xlsx?{Q}")
+    assert r.status_code == 422
+    assert "limited to 1" in r.json()["detail"] and "CSV" in r.json()["detail"]
+    run = db.scalars(select(ReportRun).order_by(ReportRun.id.desc())).first()
+    assert run.format == "xlsx" and run.status == "failed" and run.error == "ExportTooLarge"
+    # CSV is unaffected by the Excel limit.
+    assert auth_client.get(f"/api/reports/export/turnaround.csv?{Q}").status_code == 200
+
+
 def test_catalogue_offers_excel_alongside_csv(auth_client) -> None:
     items = {c["key"]: c["formats"] for c in auth_client.get("/api/reports/catalogue").json()}
     assert items["turnaround"] == ["pdf", "csv", "xlsx"]

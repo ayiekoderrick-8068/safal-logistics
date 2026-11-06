@@ -25,7 +25,13 @@ from ..db import get_db
 from ..deps import get_current_user
 from ..models import DelayCause, ReportRun, Role, User
 from ..services import reporting as rpt
-from ..services.exports import DATASETS, XLSX_MEDIA_TYPE, export_csv, export_xlsx
+from ..services.exports import (
+    DATASETS,
+    XLSX_MEDIA_TYPE,
+    ExportTooLarge,
+    export_csv,
+    export_xlsx,
+)
 from ..services.operations import local_today
 from ..services.pdf_reports import REPORTS, build_pdf
 
@@ -307,6 +313,10 @@ def export_xlsx_endpoint(
     _allow(user, CSV_ACCESS[dataset])
     try:
         content, n = export_xlsx(db, f, dataset)
+    except ExportTooLarge as exc:
+        db.rollback()
+        _record_run(db, request, user, dataset, "xlsx", f, ok=False, error="ExportTooLarge")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, str(exc)) from None
     except Exception as exc:
         db.rollback()
         _record_run(db, request, user, dataset, "xlsx", f, ok=False, error=type(exc).__name__)

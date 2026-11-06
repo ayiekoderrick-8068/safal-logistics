@@ -20,11 +20,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from openpyxl import Workbook
-from openpyxl.cell import WriteOnlyCell
-from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
-from openpyxl.styles import Alignment, Font, PatternFill
-from openpyxl.utils import get_column_letter
+import xlsxwriter
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
@@ -302,45 +298,24 @@ def export_csv(db: Session, f: ReportFilters, dataset: str) -> tuple[str, int]:
 
 # ---------------------------------------------------------------- Excel (.xlsx)
 XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-_HEADER_FILL = PatternFill("solid", start_color="0E5A6B")  # LogiTrack teal
-_HEADER_FONT = Font(bold=True, color="FFFFFF")
-_LABEL_FONT = Font(bold=True, color="0E5A6B")
-_DATETIME_FMT = "yyyy-mm-dd hh:mm"
-_DATE_FMT = "yyyy-mm-dd"
+# Excel generation is CPU-bound (~1-2 s per 10,000 rows on modest hardware). Above this
+# limit the export is refused with a clear message; CSV has no such limit.
+XLSX_MAX_ROWS = 50_000
+_TEAL = "#0E5A6B"  # LogiTrack brand teal
 _MAX_CELL = 32_767  # Excel's limit for one cell
+# XML 1.0 cannot carry these control characters; Excel rejects files containing them.
+_ILLEGAL_XML = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
+class ExportTooLarge(ValueError):
+    """The requested Excel export exceeds XLSX_MAX_ROWS."""
 
 
 def xlsx_text(value: Any) -> str:
     """Text for an Excel cell: formula-safe, free of XML-illegal control characters."""
     text = safe_cell(value)
     text = text if isinstance(text, str) else str(text)
-    return ILLEGAL_CHARACTERS_RE.sub("", text)[:_MAX_CELL]
-
-
-def _xlsx_cell(ws: Any, value: Any) -> WriteOnlyCell:
-    """Typed cell: numbers stay numeric, dates become real Excel dates (local time),
-    and every string is stored as an inline string - never as a formula."""
-    if value is None:
-        return WriteOnlyCell(ws, value=None)
-    if isinstance(value, bool):
-        cell = WriteOnlyCell(ws, value="yes" if value else "no")
-    elif isinstance(value, datetime):
-        local = value.astimezone(get_settings().tz).replace(tzinfo=None)
-        cell = WriteOnlyCell(ws, value=local)
-        cell.number_format = _DATETIME_FMT
-        return cell
-    elif isinstance(value, date):
-        cell = WriteOnlyCell(ws, value=value)
-        cell.number_format = _DATE_FMT
-        return cell
-    elif isinstance(value, (int, float, Decimal)):
-        cell = WriteOnlyCell(ws, value=float(value) if isinstance(value, Decimal) else value)
-        cell.number_format = "0" if isinstance(value, int) else "0.0"
-        return cell
-    else:
-        cell = WriteOnlyCell(ws, value=xlsx_text(value))
-    cell.data_type = "s"  # force text even when it begins with "=" (openpyxl infers formulas)
-    return cell
+    return _ILLEGAL_XML.sub("", text)[:_MAX_CELL]
 
 
 def _width(value: Any) -> int:
@@ -359,51 +334,92 @@ def write_xlsx(
     preamble: list[tuple[str, str]],
     sheet_title: str,
 ) -> bytes:
-    wb = Workbook(write_only=True)
-    wb.properties.creator = "LogiTrack"
-    wb.properties.title = sheet_title
+    """Build the workbook with explicitly typed writes.
 
-    data = wb.create_sheet(re.sub(r"[\[\]:*?/\\]", " ", sheet_title)[:31])
+    Every text value goes through ``write_string`` (never interpreted as a formula, URL or
+    number), numbers through ``write_number`` and dates through ``write_datetime`` in
+    operations local time - Excel has no time zones, so the info sheet states the zone.
+    """
+    tz = get_settings().tz
+    buf = io.BytesIO()
+    wb = xlsxwriter.Workbook(
+        buf,
+        {
+            "constant_memory": True,  # stream rows; memory stays flat for large exports
+            "strings_to_formulas": False,
+            "strings_to_urls": False,
+            "strings_to_numbers": False,
+        },
+    )
+    wb.set_properties({"title": sheet_title, "author": "LogiTrack", "company": "LogiTrack"})
+    header_fmt = wb.add_format(
+        {
+            "bold": True,
+            "font_color": "#FFFFFF",
+            "bg_color": _TEAL,
+            "text_wrap": True,
+            "valign": "vcenter",
+            "border": 1,
+            "border_color": _TEAL,
+        }
+    )
+    label_fmt = wb.add_format({"bold": True, "font_color": _TEAL})
+    dt_fmt = wb.add_format({"num_format": "yyyy-mm-dd hh:mm"})
+    d_fmt = wb.add_format({"num_format": "yyyy-mm-dd"})
+    int_fmt = wb.add_format({"num_format": "0"})
+    num_fmt = wb.add_format({"num_format": "0.0"})
+
+    ws = wb.add_worksheet(re.sub(r"[\[\]:*?/\\]", " ", sheet_title)[:31])
     values = [[fn(r) for _, fn in columns] for r in records]
     for i, (heading, _) in enumerate(columns):
         widest = max([len(heading)] + [_width(row[i]) for row in values[:2000]])
-        data.column_dimensions[get_column_letter(i + 1)].width = widest + 2
-    data.freeze_panes = "A2"
+        ws.set_column(i, i, widest + 2)
+    ws.freeze_panes(1, 0)
     if columns:
-        last = get_column_letter(len(columns))
-        data.auto_filter.ref = f"A1:{last}{max(len(values) + 1, 2)}"
+        ws.autofilter(0, 0, max(len(values), 1), len(columns) - 1)
+    for c, (heading, _) in enumerate(columns):
+        ws.write_string(0, c, xlsx_text(heading), header_fmt)
 
-    header = []
-    for heading, _ in columns:
-        c = WriteOnlyCell(data, value=xlsx_text(heading))
-        c.data_type, c.font, c.fill = "s", _HEADER_FONT, _HEADER_FILL
-        c.alignment = Alignment(vertical="center", wrap_text=True)
-        header.append(c)
-    data.append(header)
-    for row in values:
-        data.append([_xlsx_cell(data, v) for v in row])
+    write_string, write_number, write_datetime = ws.write_string, ws.write_number, ws.write_datetime
+    for r, row in enumerate(values, start=1):
+        for c, v in enumerate(row):
+            if v is None:
+                continue
+            if isinstance(v, bool):
+                write_string(r, c, "yes" if v else "no")
+            elif isinstance(v, datetime):
+                write_datetime(r, c, v.astimezone(tz).replace(tzinfo=None), dt_fmt)
+            elif isinstance(v, date):
+                write_datetime(r, c, datetime(v.year, v.month, v.day), d_fmt)
+            elif isinstance(v, int):
+                write_number(r, c, v, int_fmt)
+            elif isinstance(v, (float, Decimal)):
+                write_number(r, c, float(v), num_fmt)
+            else:
+                write_string(r, c, xlsx_text(v))
 
-    info = wb.create_sheet("Report info")
-    info.column_dimensions["A"].width = 22
-    info.column_dimensions["B"].width = 70
+    info = wb.add_worksheet("Report info")
+    info.set_column(0, 0, 22)
+    info.set_column(1, 1, 70)
     rows_info = [
         *preamble,
         ("Rows", str(len(values))),
         ("Times", f"Local time ({get_settings().timezone}); durations in minutes"),
     ]
-    for label, value in rows_info:
-        a = WriteOnlyCell(info, value=xlsx_text(label))
-        a.data_type, a.font = "s", _LABEL_FONT
-        b = WriteOnlyCell(info, value=xlsx_text(value))
-        b.data_type = "s"
-        info.append([a, b])
+    for r, (label, value) in enumerate(rows_info):
+        info.write_string(r, 0, xlsx_text(label), label_fmt)
+        info.write_string(r, 1, xlsx_text(value))
 
-    buf = io.BytesIO()
-    wb.save(buf)
+    wb.close()
     return buf.getvalue()
 
 
 def export_xlsx(db: Session, f: ReportFilters, dataset: str) -> tuple[bytes, int]:
     columns, recs = dataset_rows(db, f, dataset)
+    if len(recs) > XLSX_MAX_ROWS:
+        raise ExportTooLarge(
+            f"This export has {len(recs):,} rows; Excel exports are limited to "
+            f"{XLSX_MAX_ROWS:,}. Narrow the date range or filters, or use CSV."
+        )
     content = write_xlsx(columns, recs, export_preamble(db, f, dataset), DATASETS[dataset])
     return content, len(recs)
