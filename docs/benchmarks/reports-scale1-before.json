@@ -1,0 +1,442 @@
+{
+  "scale": 1,
+  "volume": {
+    "bookings": 28788,
+    "dispatches": 28788,
+    "incidents": 5245,
+    "assignments": 400,
+    "trucks": 80,
+    "bays": 12
+  },
+  "repeat": 5,
+  "machine": {
+    "python": "3.14.4",
+    "cpus": 4,
+    "platform": "Linux-6.18.54.1-microsoft-standard-WSL2-x86_64-with-glibc2.43"
+  },
+  "http": [
+    {
+      "period": "7d",
+      "endpoint": "summary",
+      "median_ms": 165.8,
+      "max_ms": 172.2,
+      "min_ms": 135.0,
+      "bytes": 1300
+    },
+    {
+      "period": "7d",
+      "endpoint": "turnaround",
+      "median_ms": 89.6,
+      "max_ms": 94.6,
+      "min_ms": 82.4,
+      "bytes": 19099
+    },
+    {
+      "period": "7d",
+      "endpoint": "delays",
+      "median_ms": 35.3,
+      "max_ms": 43.3,
+      "min_ms": 33.1,
+      "bytes": 10724
+    },
+    {
+      "period": "7d",
+      "endpoint": "bays",
+      "median_ms": 144.7,
+      "max_ms": 235.5,
+      "min_ms": 130.7,
+      "bytes": 4956
+    },
+    {
+      "period": "7d",
+      "endpoint": "dispatch",
+      "median_ms": 73.5,
+      "max_ms": 102.2,
+      "min_ms": 69.6,
+      "bytes": 2691
+    },
+    {
+      "period": "7d",
+      "endpoint": "records (page 1, 100 rows)",
+      "median_ms": 105.1,
+      "max_ms": 160.6,
+      "min_ms": 47.9,
+      "bytes": 45005
+    },
+    {
+      "period": "7d",
+      "endpoint": "CSV turnaround",
+      "median_ms": 131.8,
+      "max_ms": 151.2,
+      "min_ms": 100.6,
+      "bytes": 143498
+    },
+    {
+      "period": "7d",
+      "endpoint": "CSV dispatches",
+      "median_ms": 93.6,
+      "max_ms": 183.2,
+      "min_ms": 76.7,
+      "bytes": 91565
+    },
+    {
+      "period": "7d",
+      "endpoint": "XLSX turnaround",
+      "median_ms": 701.4,
+      "max_ms": 1021.6,
+      "min_ms": 628.8,
+      "bytes": 56559
+    },
+    {
+      "period": "7d",
+      "endpoint": "XLSX dispatches",
+      "median_ms": 396.1,
+      "max_ms": 406.1,
+      "min_ms": 382.8,
+      "bytes": 39209
+    },
+    {
+      "period": "7d",
+      "endpoint": "PDF executive",
+      "median_ms": 479.6,
+      "max_ms": 592.9,
+      "min_ms": 361.8,
+      "bytes": 6644
+    },
+    {
+      "period": "7d",
+      "endpoint": "PDF turnaround",
+      "median_ms": 285.5,
+      "max_ms": 365.3,
+      "min_ms": 261.3,
+      "bytes": 10035
+    },
+    {
+      "period": "30d",
+      "endpoint": "summary",
+      "median_ms": 538.1,
+      "max_ms": 970.8,
+      "min_ms": 437.8,
+      "bytes": 3470
+    },
+    {
+      "period": "30d",
+      "endpoint": "turnaround",
+      "median_ms": 788.2,
+      "max_ms": 818.5,
+      "min_ms": 412.8,
+      "bytes": 22902
+    },
+    {
+      "period": "30d",
+      "endpoint": "delays",
+      "median_ms": 188.0,
+      "max_ms": 216.8,
+      "min_ms": 93.5,
+      "bytes": 14234
+    },
+    {
+      "period": "30d",
+      "endpoint": "bays",
+      "median_ms": 363.1,
+      "max_ms": 421.1,
+      "min_ms": 348.4,
+      "bytes": 5020
+    },
+    {
+      "period": "30d",
+      "endpoint": "dispatch",
+      "median_ms": 269.9,
+      "max_ms": 319.1,
+      "min_ms": 186.3,
+      "bytes": 2719
+    },
+    {
+      "period": "30d",
+      "endpoint": "records (page 1, 100 rows)",
+      "median_ms": 87.3,
+      "max_ms": 122.1,
+      "min_ms": 53.6,
+      "bytes": 45006
+    },
+    {
+      "period": "30d",
+      "endpoint": "CSV turnaround",
+      "median_ms": 1210.4,
+      "max_ms": 1322.8,
+      "min_ms": 510.8,
+      "bytes": 706945
+    },
+    {
+      "period": "30d",
+      "endpoint": "CSV dispatches",
+      "median_ms": 630.8,
+      "max_ms": 693.8,
+      "min_ms": 497.6,
+      "bytes": 450697
+    },
+    {
+      "period": "30d",
+      "endpoint": "XLSX turnaround",
+      "median_ms": 4000.9,
+      "max_ms": 7668.4,
+      "min_ms": 2892.3,
+      "bytes": 252660
+    },
+    {
+      "period": "30d",
+      "endpoint": "XLSX dispatches",
+      "median_ms": 2007.9,
+      "max_ms": 2673.2,
+      "min_ms": 1929.6,
+      "bytes": 166491
+    },
+    {
+      "period": "30d",
+      "endpoint": "PDF executive",
+      "median_ms": 1746.4,
+      "max_ms": 2603.2,
+      "min_ms": 1526.6,
+      "bytes": 7854
+    },
+    {
+      "period": "30d",
+      "endpoint": "PDF turnaround",
+      "median_ms": 1215.2,
+      "max_ms": 2686.5,
+      "min_ms": 1036.2,
+      "bytes": 10897
+    },
+    {
+      "period": "90d",
+      "endpoint": "summary",
+      "median_ms": 1173.5,
+      "max_ms": 1212.4,
+      "min_ms": 1030.7,
+      "bytes": 9097
+    },
+    {
+      "period": "90d",
+      "endpoint": "turnaround",
+      "median_ms": 687.0,
+      "max_ms": 775.2,
+      "min_ms": 630.7,
+      "bytes": 30974
+    },
+    {
+      "period": "90d",
+      "endpoint": "delays",
+      "median_ms": 117.0,
+      "max_ms": 129.3,
+      "min_ms": 101.7,
+      "bytes": 18229
+    },
+    {
+      "period": "90d",
+      "endpoint": "bays",
+      "median_ms": 1008.1,
+      "max_ms": 1344.2,
+      "min_ms": 992.9,
+      "bytes": 5049
+    },
+    {
+      "period": "90d",
+      "endpoint": "dispatch",
+      "median_ms": 343.8,
+      "max_ms": 376.4,
+      "min_ms": 313.6,
+      "bytes": 2715
+    },
+    {
+      "period": "90d",
+      "endpoint": "records (page 1, 100 rows)",
+      "median_ms": 45.0,
+      "max_ms": 52.1,
+      "min_ms": 41.0,
+      "bytes": 45006
+    },
+    {
+      "period": "90d",
+      "endpoint": "CSV turnaround",
+      "median_ms": 1417.3,
+      "max_ms": 2036.4,
+      "min_ms": 663.4,
+      "bytes": 2176926
+    },
+    {
+      "period": "90d",
+      "endpoint": "CSV dispatches",
+      "median_ms": 447.7,
+      "max_ms": 527.5,
+      "min_ms": 396.5,
+      "bytes": 1387856
+    },
+    {
+      "period": "90d",
+      "endpoint": "XLSX turnaround",
+      "median_ms": 13641.0,
+      "max_ms": 17899.1,
+      "min_ms": 8955.0,
+      "bytes": 765348
+    },
+    {
+      "period": "90d",
+      "endpoint": "XLSX dispatches",
+      "median_ms": 7203.2,
+      "max_ms": 9605.6,
+      "min_ms": 6082.1,
+      "bytes": 498914
+    },
+    {
+      "period": "90d",
+      "endpoint": "PDF executive",
+      "median_ms": 4196.8,
+      "max_ms": 5070.3,
+      "min_ms": 2192.1,
+      "bytes": 7831
+    },
+    {
+      "period": "90d",
+      "endpoint": "PDF turnaround",
+      "median_ms": 1808.2,
+      "max_ms": 2350.8,
+      "min_ms": 1617.8,
+      "bytes": 10883
+    },
+    {
+      "period": "366d",
+      "endpoint": "summary",
+      "median_ms": 4457.4,
+      "max_ms": 6552.9,
+      "min_ms": 4434.9,
+      "bytes": 35013
+    },
+    {
+      "period": "366d",
+      "endpoint": "turnaround",
+      "median_ms": 5470.1,
+      "max_ms": 7435.3,
+      "min_ms": 3850.8,
+      "bytes": 67978
+    },
+    {
+      "period": "366d",
+      "endpoint": "delays",
+      "median_ms": 447.0,
+      "max_ms": 759.7,
+      "min_ms": 386.8,
+      "bytes": 36034
+    },
+    {
+      "period": "366d",
+      "endpoint": "bays",
+      "median_ms": 5971.1,
+      "max_ms": 7266.2,
+      "min_ms": 3779.3,
+      "bytes": 5090
+    },
+    {
+      "period": "366d",
+      "endpoint": "dispatch",
+      "median_ms": 2713.6,
+      "max_ms": 2933.0,
+      "min_ms": 1660.2,
+      "bytes": 2743
+    },
+    {
+      "period": "366d",
+      "endpoint": "records (page 1, 100 rows)",
+      "median_ms": 80.9,
+      "max_ms": 119.4,
+      "min_ms": 68.7,
+      "bytes": 45007
+    },
+    {
+      "period": "366d",
+      "endpoint": "CSV turnaround",
+      "median_ms": 4168.4,
+      "max_ms": 5624.5,
+      "min_ms": 3929.6,
+      "bytes": 8923774
+    },
+    {
+      "period": "366d",
+      "endpoint": "CSV dispatches",
+      "median_ms": 4398.9,
+      "max_ms": 6457.9,
+      "min_ms": 3031.7,
+      "bytes": 5690934
+    },
+    {
+      "period": "366d",
+      "endpoint": "XLSX turnaround",
+      "median_ms": 39922.0,
+      "max_ms": 58747.7,
+      "min_ms": 24570.5,
+      "bytes": 3113417
+    },
+    {
+      "period": "366d",
+      "endpoint": "XLSX dispatches",
+      "median_ms": 23818.0,
+      "max_ms": 32604.1,
+      "min_ms": 16524.3,
+      "bytes": 2037593
+    },
+    {
+      "period": "366d",
+      "endpoint": "PDF executive",
+      "median_ms": 15967.3,
+      "max_ms": 21420.8,
+      "min_ms": 9533.0,
+      "bytes": 7836
+    },
+    {
+      "period": "366d",
+      "endpoint": "PDF turnaround",
+      "median_ms": 6344.9,
+      "max_ms": 7242.7,
+      "min_ms": 5662.9,
+      "bytes": 10821
+    },
+    {
+      "period": "366d",
+      "endpoint": "summary + driver",
+      "median_ms": 297.5,
+      "max_ms": 470.2,
+      "min_ms": 238.3,
+      "bytes": null
+    },
+    {
+      "period": "366d",
+      "endpoint": "CSV dispatches + driver",
+      "median_ms": 81.8,
+      "max_ms": 116.2,
+      "min_ms": 69.9,
+      "bytes": null
+    }
+  ],
+  "sql_366d": [
+    {
+      "query": "load_query (departed)",
+      "rows": 26268,
+      "median_ms": 729.2,
+      "max_ms": 912.0,
+      "min_ms": 610.2
+    },
+    {
+      "query": "dispatch_query",
+      "rows": 26268,
+      "median_ms": 381.8,
+      "max_ms": 435.3,
+      "min_ms": 337.2
+    },
+    {
+      "query": "incident_query",
+      "rows": 4784,
+      "median_ms": 99.6,
+      "max_ms": 197.6,
+      "min_ms": 88.8
+    }
+  ]
+}
