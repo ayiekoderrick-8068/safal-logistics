@@ -67,6 +67,7 @@ export function EquipmentFormModal({
   onSaved: (e: Equipment) => void
 }) {
   const editing = !!equipment
+  const managed = !!equipment && 'schedule_managed' in equipment && !!equipment.schedule_managed
   const [serverError, setServerError] = useState<string | null>(null)
   const options = useApi<EquipmentOptions>('/maintenance/equipment/options')
   const e = equipment
@@ -106,8 +107,8 @@ export function EquipmentFormModal({
       installed_on: v.installed_on || null,
       status: v.status,
       assigned_technician_id: v.assigned_technician_id ? Number(v.assigned_technician_id) : null,
-      last_service_on: v.last_service_on || null,
-      next_service_on: v.next_service_on || null,
+      // Schedule-managed dates are owned by preventive maintenance: never sent from here.
+      ...(managed ? {} : { last_service_on: v.last_service_on || null, next_service_on: v.next_service_on || null }),
       notes: orNull(v.notes),
     }
     try {
@@ -194,13 +195,17 @@ export function EquipmentFormModal({
           </Field>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field id="eq-last" label="Last service date (optional)" error={err('last_service_on')}>
+          <Field id="eq-last" label="Last service date (optional)" error={err('last_service_on')}
+            hint={managed ? 'Recorded when preventive-maintenance tasks are completed.' : undefined}>
             <input type="date" max={todayIso()} {...a11y('eq-last', err('last_service_on'))} {...register('last_service_on')}
-              className={inputClass} />
+              readOnly={managed} className={`${inputClass} read-only:bg-slate-50`} />
           </Field>
           <Field id="eq-next" label="Next service date (optional)" error={err('next_service_on')}
-            hint="Set by preventive-maintenance plans once they are introduced.">
-            <input type="date" {...a11y('eq-next', err('next_service_on'))} {...register('next_service_on')} className={inputClass} />
+            hint={managed
+              ? 'Set by the preventive-maintenance schedule. Reschedule the task to change it.'
+              : 'Once a preventive plan is added, the schedule sets this date.'}>
+            <input type="date" {...a11y('eq-next', err('next_service_on'))} {...register('next_service_on')}
+              readOnly={managed} className={`${inputClass} read-only:bg-slate-50`} />
           </Field>
         </div>
         <Field id="eq-notes" label="Notes (optional)" error={err('notes')}>

@@ -1,5 +1,8 @@
 import type { Tone } from '../../../lib/statusColors'
-import type { EquipmentStatus, ServiceState } from '../../../lib/maintenance'
+import type { EquipmentStatus, ServiceState, TaskState } from '../../../lib/maintenance'
+
+export const taskTone = (s: TaskState): Tone =>
+  s === 'overdue' ? 'red' : s === 'due_today' ? 'amber' : s === 'completed' ? 'green' : s === 'upcoming' ? 'blue' : 'slate'
 
 /** Equipment out of service is a red flag in maintenance (a truck out of service is neutral). */
 export const equipmentTone = (s: EquipmentStatus): Tone =>

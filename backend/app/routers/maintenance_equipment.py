@@ -20,7 +20,15 @@ from ..db import get_db
 from ..deps import require_maintenance
 from ..maintenance_permissions import MaintenancePermission as P
 from ..models import MaintenanceRole, Role, User, UserStatus
-from ..models_maintenance import Equipment, EquipmentCategory, EquipmentEvent, EquipmentStatus
+from ..models_maintenance import (
+    Equipment,
+    EquipmentCategory,
+    EquipmentEvent,
+    EquipmentStatus,
+    MaintenancePlan,
+    MaintenanceTask,
+    TaskStatus,
+)
 from ..schemas_maintenance import (
     EquipmentDetail,
     EquipmentEventOut,
@@ -43,6 +51,7 @@ from ..services.operations import (
     not_found,
     utcnow,
 )
+from ..services.pm import is_plan_driven, sync_equipment_dates
 
 router = APIRouter(prefix="/api/maintenance", tags=["maintenance: equipment"])
 DB = Annotated[Session, Depends(get_db)]
@@ -298,7 +307,9 @@ def get_equipment(equipment_id: int, db: DB, _: Reader) -> EquipmentDetail:
         )
         for e in events
     ]
-    return EquipmentDetail(**_out(eq, local_today()), history=history)
+    return EquipmentDetail(
+        **_out(eq, local_today()), history=history, schedule_managed=is_plan_driven(db, eq.id)
+    )
 
 
 # ---------- write ----------
@@ -344,6 +355,14 @@ def update_equipment(
             raise invalid(f"{field.replace('_', ' ').capitalize()} cannot be empty.")
 
     new = {f: getattr(body, f) for f in sent}
+    service_edits = {
+        f for f in ("last_service_on", "next_service_on") if f in new and new[f] != getattr(eq, f)
+    }
+    if service_edits and is_plan_driven(db, eq.id):
+        raise conflict(
+            "Service dates for this equipment are set by its preventive-maintenance schedule. "
+            "Complete or reschedule its tasks instead."
+        )
     installed = new.get("installed_on", eq.installed_on)
     last = new.get("last_service_on", eq.last_service_on)
     nxt = new.get("next_service_on", eq.next_service_on)
@@ -418,7 +437,38 @@ def archive_equipment(
     eq.archived_at = utcnow()
     eq.archived_by_id = user.id
     reason = " ".join(body.reason.split())
-    _event(db, eq, "archived", f"Archived: {reason}", user, {"reason": reason})
+    # Archived equipment gets no further maintenance: stop its plans, cancel open tasks.
+    stopped = 0
+    for plan in db.scalars(
+        select(MaintenancePlan).where(
+            MaintenancePlan.equipment_id == eq.id, MaintenancePlan.is_active
+        )
+    ):
+        plan.is_active = False
+        stopped += 1
+    cancelled = 0
+    for task in db.scalars(
+        select(MaintenanceTask)
+        .where(
+            MaintenanceTask.equipment_id == eq.id, MaintenanceTask.status == TaskStatus.SCHEDULED
+        )
+        .with_for_update()
+    ):
+        task.status = TaskStatus.CANCELLED
+        task.cancel_reason = f"Equipment archived: {reason}"[:255]
+        task.cancelled_at = eq.archived_at
+        task.cancelled_by_id = user.id
+        cancelled += 1
+    if stopped or cancelled:
+        sync_equipment_dates(db, eq)
+    _event(
+        db,
+        eq,
+        "archived",
+        f"Archived: {reason}",
+        user,
+        {"reason": reason, "plans_stopped": stopped, "tasks_cancelled": cancelled},
+    )
     record_event(
         db,
         action="equipment.archived",

@@ -71,6 +71,91 @@ export interface EquipmentEvent {
 
 export interface EquipmentDetail extends Equipment {
   history: EquipmentEvent[]
+  /** Service dates come from preventive maintenance (read-only in the equipment form). */
+  schedule_managed: boolean
+}
+
+// ---------- Preventive maintenance ----------
+export type IntervalUnit = 'days' | 'weeks' | 'months'
+export type ScheduleBasis = 'due_date' | 'completion_date'
+export type TaskState = 'overdue' | 'due_today' | 'upcoming' | 'completed' | 'cancelled'
+
+export interface EquipmentRef {
+  id: number
+  code: string
+  name: string
+}
+
+export interface MaintenancePlan {
+  id: number
+  equipment: EquipmentRef
+  title: string
+  instructions: string | null
+  interval_value: number
+  interval_unit: IntervalUnit
+  schedule_basis: ScheduleBasis
+  start_on: string
+  assigned_technician: Person | null
+  is_active: boolean
+  next_task: { id: number; due_on: string; state: TaskState; days_until_due: number } | null
+  last_completed_on: string | null
+  created_at: string
+}
+
+export interface MaintenanceTask {
+  id: number
+  plan_id: number | null
+  equipment: EquipmentRef
+  title: string
+  instructions: string | null
+  due_on: string
+  status: 'scheduled' | 'completed' | 'cancelled'
+  state: TaskState
+  days_until_due: number
+  assigned_technician: Person | null
+  completed_on: string | null
+  completed_by: Person | null
+  completed_on_time: boolean | null
+  work_notes: string | null
+  cancel_reason: string | null
+}
+
+export interface PmSummary {
+  overdue: number
+  due_today: number
+  due_next_7_days: number
+  open: number
+  active_plans: number
+  completed_last_30_days: number
+  compliance: {
+    window_days: number
+    due: number
+    completed_on_time: number
+    completed_late: number
+    not_completed: number
+    pct: number | null
+  }
+}
+
+export const TASK_STATE_LABELS: Record<TaskState, string> = {
+  overdue: 'Overdue',
+  due_today: 'Due today',
+  upcoming: 'Upcoming',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+}
+
+export function intervalText(value: number, unit: IntervalUnit): string {
+  const word = unit.slice(0, -1)
+  return value === 1 ? `Every ${word}` : `Every ${value} ${unit}`
+}
+
+export function dueText(t: { state: TaskState; days_until_due: number }): string {
+  const n = Math.abs(t.days_until_due)
+  if (t.state === 'overdue') return `${n} day${n === 1 ? '' : 's'} overdue`
+  if (t.state === 'due_today') return 'Due today'
+  if (t.state === 'upcoming') return `Due in ${n} day${n === 1 ? '' : 's'}`
+  return ''
 }
 
 export interface EquipmentSummary {
@@ -108,6 +193,12 @@ export function useMaintenanceAccess() {
     role: data?.maintenance_role,
     can: (p: MaintenancePermission) => !!data?.permissions.includes(p),
   }
+}
+
+/** Fired after any change that can move maintenance counts (e.g. the top-bar alert). */
+export const MAINTENANCE_CHANGED = 'logitrack:maintenance-changed'
+export function notifyMaintenanceChanged() {
+  window.dispatchEvent(new Event(MAINTENANCE_CHANGED))
 }
 
 export function serviceText(e: Pick<Equipment, 'service_state' | 'days_until_service'>): string {

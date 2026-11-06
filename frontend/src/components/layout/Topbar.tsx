@@ -9,6 +9,7 @@ import { initials, MAINTENANCE_ROLE_LABELS, ROLE_LABELS, WORKSPACE_LABELS } from
 import type { Workspace } from '../../lib/types'
 import { ALL_MAINTENANCE_ITEMS } from '../../maintenanceNav'
 import { ALL_NAV_ITEMS } from '../../nav'
+import { MaintenanceAlerts } from './MaintenanceAlerts'
 import { NotificationBell } from './NotificationBell'
 
 export function Topbar({ workspace = 'logistics', onToggleNav }: { workspace?: Workspace; onToggleNav: () => void }) {
@@ -99,8 +100,8 @@ export function Topbar({ workspace = 'logistics', onToggleNav }: { workspace?: W
         >
           {WORKSPACE_LABELS[workspace]}
         </span>
-        {/* Alerts are logistics data; the maintenance workspace gets its own in a later milestone. */}
-        {workspace === 'logistics' && <NotificationBell />}
+        {/* Each workspace shows its own alerts. */}
+        {workspace === 'logistics' ? <NotificationBell /> : <MaintenanceAlerts />}
 
         <div className="relative" ref={menuRef}>
           <button

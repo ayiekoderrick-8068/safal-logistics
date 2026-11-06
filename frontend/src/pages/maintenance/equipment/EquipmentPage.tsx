@@ -18,6 +18,7 @@ import { formatDate, formatNumber } from '../../../lib/format'
 import {
   CATEGORY_LABELS,
   EQUIPMENT_STATUS_LABELS,
+  notifyMaintenanceChanged,
   serviceText,
   useMaintenanceAccess,
   type Equipment,
@@ -123,7 +124,7 @@ export function EquipmentPage() {
         )}
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
         <StatCard icon={Wrench} tone="blue" label="Registered Equipment" value={formatNumber(s?.total)}
           note={s ? `${s.archived} archived` : undefined} />
         <StatCard icon={CircleCheck} tone="green" label="Operational" value={formatNumber(s?.operational)} />
@@ -275,6 +276,7 @@ export function EquipmentPage() {
           onDone={(e) => {
             setDialog(null)
             reload()
+            notifyMaintenanceChanged() // archiving cancels the asset's open maintenance
             toast.success(`${e.code} archived`)
           }}
         />

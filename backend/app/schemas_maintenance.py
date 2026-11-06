@@ -4,7 +4,13 @@ from typing import Any, Self
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .models import MaintenanceRole
-from .models_maintenance import EquipmentCategory, EquipmentStatus
+from .models_maintenance import (
+    EquipmentCategory,
+    EquipmentStatus,
+    IntervalUnit,
+    ScheduleBasis,
+    TaskStatus,
+)
 
 CODE_PATTERN = r"^[A-Z0-9][A-Z0-9-]{1,29}$"
 TEXT_FIELDS = (
@@ -153,6 +159,8 @@ class EquipmentEventOut(BaseModel):
 
 class EquipmentDetail(EquipmentOut):
     history: list[EquipmentEventOut]
+    # True once preventive maintenance sets the service dates (they are then read-only here).
+    schedule_managed: bool = False
 
 
 class EquipmentSummary(BaseModel):
@@ -175,3 +183,151 @@ class EquipmentOptions(BaseModel):
     departments: list[str]
     locations: list[str]
     technicians: list[Technician]
+
+
+# ---------- Preventive maintenance ----------
+def _text(v: object) -> object:
+    return (" ".join(v.split()) or None) if isinstance(v, str) else v
+
+
+class EquipmentRef(BaseModel):
+    id: int
+    code: str
+    name: str
+
+
+class PlanIn(BaseModel):
+    equipment_id: int
+    title: str = Field(min_length=3, max_length=120)
+    instructions: str | None = Field(default=None, max_length=4000)
+    interval_value: int = Field(ge=1, le=3650)
+    interval_unit: IntervalUnit
+    schedule_basis: ScheduleBasis = ScheduleBasis.DUE_DATE
+    start_on: date = Field(description="Due date of the first task")
+    assigned_technician_id: int | None = None
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def _title(cls, v: object) -> object:
+        return _text(v)
+
+
+class PlanUpdate(BaseModel):
+    """Changes apply to tasks generated from now on; the open task keeps its due date
+    unless it is rescheduled separately."""
+
+    title: str | None = Field(default=None, min_length=3, max_length=120)
+    instructions: str | None = Field(default=None, max_length=4000)
+    interval_value: int | None = Field(default=None, ge=1, le=3650)
+    interval_unit: IntervalUnit | None = None
+    schedule_basis: ScheduleBasis | None = None
+    assigned_technician_id: int | None = None
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def _title(cls, v: object) -> object:
+        return _text(v)
+
+
+class PlanActivate(BaseModel):
+    next_due_on: date
+
+
+class TaskBrief(BaseModel):
+    id: int
+    due_on: date
+    state: str
+    days_until_due: int
+
+
+class PlanOut(BaseModel):
+    id: int
+    equipment: EquipmentRef
+    title: str
+    instructions: str | None
+    interval_value: int
+    interval_unit: IntervalUnit
+    schedule_basis: ScheduleBasis
+    start_on: date
+    assigned_technician: Person | None
+    is_active: bool
+    next_task: TaskBrief | None
+    last_completed_on: date | None
+    created_at: datetime
+
+
+class TaskIn(BaseModel):
+    """A once-off scheduled service (not part of a recurring plan)."""
+
+    equipment_id: int
+    title: str = Field(min_length=3, max_length=120)
+    due_on: date
+    assigned_technician_id: int | None = None
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def _title(cls, v: object) -> object:
+        return _text(v)
+
+
+class TaskUpdate(BaseModel):
+    due_on: date | None = None
+    assigned_technician_id: int | None = None
+
+
+class TaskComplete(BaseModel):
+    completed_on: date
+    work_notes: str = Field(min_length=3, max_length=4000, description="Work performed")
+
+    @field_validator("work_notes", mode="before")
+    @classmethod
+    def _notes(cls, v: object) -> object:
+        return v.strip() if isinstance(v, str) else v
+
+
+class TaskCancel(BaseModel):
+    reason: str = Field(min_length=3, max_length=255)
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def _reason(cls, v: object) -> object:
+        return _text(v) or ""
+
+
+class TaskOut(BaseModel):
+    id: int
+    plan_id: int | None
+    equipment: EquipmentRef
+    title: str
+    instructions: str | None
+    due_on: date
+    status: TaskStatus
+    state: str  # overdue | due_today | upcoming | completed | cancelled
+    days_until_due: int
+    assigned_technician: Person | None
+    completed_on: date | None
+    completed_by: Person | None
+    completed_on_time: bool | None
+    work_notes: str | None
+    cancel_reason: str | None
+
+
+class PmCompliance(BaseModel):
+    """Tasks due in the window (cancelled excluded): how many were completed by their due date."""
+
+    window_days: int
+    due: int
+    completed_on_time: int
+    completed_late: int
+    not_completed: int
+    pct: float | None  # None = no task fell due in the window (insufficient data)
+
+
+class PmSummary(BaseModel):
+    overdue: int
+    due_today: int
+    due_next_7_days: int
+    open: int
+    active_plans: int
+    completed_last_30_days: int
+    compliance: PmCompliance

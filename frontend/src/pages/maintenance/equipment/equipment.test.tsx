@@ -52,7 +52,8 @@ function setup(permissions: string[]) {
 describe('equipment register', () => {
   it('lists equipment with live counts, service state and history', async () => {
     setup(['view'])
-    expect(await screen.findByRole('heading', { name: 'Equipment Register' })).toBeInTheDocument()
+    // First render also loads the lazy page chunk (slow under a full parallel test run).
+    expect(await screen.findByRole('heading', { name: 'Equipment Register' }, { timeout: 8000 })).toBeInTheDocument()
     const overdue = await screen.findByRole('article', { name: 'Service Overdue' })
     expect(within(overdue).getByTestId('stat-value')).toHaveTextContent('1')
     expect((await screen.findAllByText('5 days overdue')).length).toBeGreaterThan(0)
@@ -64,7 +65,7 @@ describe('equipment register', () => {
 
   it('validates the form and shows server errors', async () => {
     setup(['view', 'equipment.manage'])
-    await userEvent.click(await screen.findByRole('button', { name: /Add Equipment/ }))
+    await userEvent.click(await screen.findByRole('button', { name: /Add Equipment/ }, { timeout: 8000 }))
     const dialog = await screen.findByRole('dialog')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Register equipment' }))
     expect(await within(dialog).findByText(/2–30 characters/)).toBeInTheDocument()

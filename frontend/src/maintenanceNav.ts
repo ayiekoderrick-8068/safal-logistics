@@ -35,10 +35,6 @@ export const MAINTENANCE_NAV: NavSection[] = [
         to: '/maintenance/preventive', label: 'Preventive Maintenance', title: 'Preventive Maintenance',
         icon: CalendarClock,
         description: 'Recurring service plans, due dates and overdue tasks.',
-        planned: {
-          milestone: 'Milestone 3',
-          features: ['Recurring date-based service plans', 'Generated tasks with automatic overdue flags'],
-        },
       },
       {
         to: '/maintenance/work-orders', label: 'Work Orders', title: 'Work Orders', icon: ClipboardList,

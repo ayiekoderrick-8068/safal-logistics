@@ -9,7 +9,7 @@ design; it is updated as each milestone lands.
 |-----------|-------|--------|
 | 1 — Foundation | Workspace chooser, maintenance sign-in, workspace-bound sessions, password re-authentication, maintenance roles | Done |
 | 2 — Equipment | Equipment register, details, maintenance history | Done |
-| 3 — Scheduling | Preventive-maintenance plans, recurring tasks, overdue flags | Planned |
+| 3 — Scheduling | Preventive-maintenance plans, recurring tasks, overdue flags | Done |
 | 4 — Work orders | Work-order lifecycle, breakdown tracking, repair records | Planned |
 | 5 — Spare parts | Inventory, consumption, reorder alerts | Planned |
 | 6 — Analytics | Dashboard KPIs, MTTR, MTBF, PM compliance, availability, exports | Planned |
@@ -92,7 +92,53 @@ status, facility, service-state and archived filters, paginated), `GET /summary`
 `GET /options`, `GET /{id}` (with history), `POST`, `PATCH /{id}`, `POST /{id}/archive`,
 `POST /{id}/restore`. Writes need `equipment.manage`.
 
+## Preventive maintenance (Milestone 3)
+
+Tables `maintenance_plans` and `maintenance_tasks`; rules in `backend/app/services/pm.py`.
+
+* **Date-based only.** No dependable equipment meter readings exist, so there is no
+  operating-hour scheduling.
+* A **plan** repeats every N days, weeks or months (month arithmetic clamps to month end:
+  31 Jan + 1 month = 28/29 Feb). Creating it generates the first task on its first due date.
+  A **once-off service** can also be scheduled without a plan.
+* **One open task per plan**, enforced by a partial unique index: a late plan shows one
+  overdue task, it never piles up duplicates.
+* **Closing a task generates the next one.** Completing it (completion date not in the
+  future, *work performed* required) or cancelling it (reason required) schedules the plan's
+  next task. Next due date: `due_date` basis = previous due date + interval (fixed calendar;
+  late work does not shift the schedule, so a very late completion can leave the next task
+  already overdue — reported as such); `completion_date` basis = completion date + interval.
+* **Overdue rule:** a task is overdue when its due date (operations timezone) has passed and it
+  is still scheduled — not completed and not cancelled. "Overdue" is derived on every read and
+  never stored. **Nothing is ever completed automatically.**
+* **Concurrency:** completing or cancelling locks the task row; a second simultaneous attempt
+  gets 409, and exactly one next task is generated (covered by a two-thread test).
+* **Equipment dates follow the schedule.** Once an asset has plans or tasks, its next service
+  date is its earliest open task and its last service date its latest completion; the
+  equipment form shows them read-only and the API refuses hand edits (409). The Milestone 2
+  CHECK "next service ≥ last service" was dropped (migration `d5f9b2c3e4a6`) because an asset
+  with several plans can have one task overdue while another was serviced today.
+* **Archiving equipment** stops its plans and cancels its open tasks with the archive reason.
+* **PM compliance** (summary, last 90 days): of the tasks that fell due in the window
+  (excluding cancelled), the share completed on or before the due date. Late completions and
+  still-open tasks count against it. When no task fell due the API returns `pct: null` and the
+  UI says "No tasks fell due in the last 90 days" rather than showing 0 % or 100 %.
+* **Overdue alert:** the maintenance top bar shows the live count of overdue plus due-today
+  tasks and links to the overdue view.
+* Permissions: plans, once-off scheduling, rescheduling, reassigning and cancelling need
+  `plans.manage`; completing needs `work_orders.work` (technicians included).
+
+API under `/api/maintenance`: `GET /pm/summary`; `GET|POST /plans`, `PATCH /plans/{id}`,
+`POST /plans/{id}/deactivate|activate`; `GET|POST /tasks` (views: overdue, due_today,
+upcoming, open, completed, cancelled, all; `mine`, `equipment_id`, `technician_id`,
+`within_days`), `PATCH /tasks/{id}`, `POST /tasks/{id}/complete|cancel`. Every change is added
+to the equipment history and the audit log.
+
 ## Migrations
+
+`d5f9b2c3e4a6` creates the plan and task tables and drops the equipment
+`next_service_after_last` CHECK (see above). Its downgrade restores the CHECK after clearing
+next-service dates that would violate it.
 
 `c4e8a1d2f3b5` creates the two equipment tables (new tables only).
 
