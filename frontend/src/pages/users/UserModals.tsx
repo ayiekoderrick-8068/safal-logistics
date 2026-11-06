@@ -8,11 +8,20 @@ import { Field, FormActions, FormError } from '../../components/ui/Form'
 import { a11y } from '../../components/ui/formA11y'
 import { Modal } from '../../components/ui/Modal'
 import { api, ApiError } from '../../lib/api'
-import { ROLE_LABELS } from '../../lib/format'
+import { MAINTENANCE_ROLE_LABELS, ROLE_LABELS } from '../../lib/format'
 import { generatePassword, passwordRule } from '../../lib/passwords'
-import type { AdminUser, Role } from '../../lib/types'
+import type { AdminUser, MaintenanceRole, Role } from '../../lib/types'
 
 const ROLES = Object.keys(ROLE_LABELS) as Role[]
+const MAINTENANCE_ROLES = Object.keys(MAINTENANCE_ROLE_LABELS) as MaintenanceRole[]
+const MAINTENANCE_HELP: Record<MaintenanceRole | '', string> = {
+  '': 'No access to the Maintenance workspace.',
+  manager: 'Everything in Maintenance, including settings.',
+  planner: 'Equipment, preventive plans, work-order planning and assignment, reports.',
+  technician: 'Work on assigned orders, log breakdowns, use spare parts.',
+  storekeeper: 'Spare-parts stock and consumption, reports.',
+  viewer: 'Read-only access to maintenance records and reports.',
+}
 const ROLE_HELP: Record<Role, string> = {
   admin: 'Full access, including user management.',
   operations: 'Bays, schedules, dispatch, delivery and operational reports.',
@@ -51,9 +60,11 @@ const createSchema = z.object({
     .regex(/^[a-z0-9][a-z0-9._-]{2,49}$/, '3–50 characters: letters, numbers, dot, dash or underscore'),
   email: z.string().trim().email('Enter a valid email address'),
   role: z.enum(ROLES as [Role, ...Role[]]),
+  // Optional: the select is disabled (no value submitted) for administrators.
+  maintenance_role: z.enum(['', ...MAINTENANCE_ROLES] as ['', ...MaintenanceRole[]]).optional(),
   temporary_password: passwordRule,
 })
-const editSchema = createSchema.pick({ full_name: true, role: true })
+const editSchema = createSchema.pick({ full_name: true, role: true, maintenance_role: true })
 type CreateValues = z.infer<typeof createSchema>
 
 export function UserFormModal({
@@ -74,21 +85,28 @@ export function UserFormModal({
       username: user?.username ?? '',
       email: user?.email ?? '',
       role: user?.role ?? 'viewer',
+      maintenance_role: user?.maintenance_role ?? '',
       temporary_password: '',
     },
   })
   const role = useWatch({ control, name: 'role' })
+  const maintenanceRole = useWatch({ control, name: 'maintenance_role' })
   const tempPassword = useWatch({ control, name: 'temporary_password' })
 
   const submit = handleSubmit(async (v) => {
     setServerError(null)
+    const maintenance_role = v.maintenance_role || null
     try {
       const saved = editing
         ? await api<AdminUser>(`/users/${user.id}`, {
             method: 'PATCH',
-            body: JSON.stringify(isSelf ? { full_name: v.full_name } : { full_name: v.full_name, role: v.role }),
+            body: JSON.stringify(
+              isSelf
+                ? { full_name: v.full_name }
+                : { full_name: v.full_name, role: v.role, maintenance_role },
+            ),
           })
-        : await api<AdminUser>('/users', { method: 'POST', body: JSON.stringify(v) })
+        : await api<AdminUser>('/users', { method: 'POST', body: JSON.stringify({ ...v, maintenance_role }) })
       onSaved(saved, !editing)
     } catch (err) {
       setServerError(err instanceof ApiError ? err.message : 'Could not save the user.')
@@ -119,6 +137,16 @@ export function UserFormModal({
           hint={isSelf ? 'You cannot change your own role.' : ROLE_HELP[role]}>
           <select id="user-role" {...register('role')} disabled={isSelf} className={inputClass}>
             {ROLES.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+          </select>
+        </Field>
+        <Field id="user-maintenance-role" label="Maintenance workspace"
+          hint={role === 'admin'
+            ? 'Administrators always have full access to Maintenance.'
+            : MAINTENANCE_HELP[maintenanceRole ?? '']}>
+          <select id="user-maintenance-role" {...register('maintenance_role')}
+            disabled={isSelf || role === 'admin'} className={inputClass}>
+            <option value="">No access</option>
+            {MAINTENANCE_ROLES.map((r) => <option key={r} value={r}>{MAINTENANCE_ROLE_LABELS[r]}</option>)}
           </select>
         </Field>
         {!editing && (

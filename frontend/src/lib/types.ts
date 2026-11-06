@@ -1,4 +1,6 @@
 export type Role = 'admin' | 'operations' | 'fleet_manager' | 'compliance' | 'viewer'
+export type MaintenanceRole = 'manager' | 'planner' | 'technician' | 'storekeeper' | 'viewer'
+export type Workspace = 'logistics' | 'maintenance'
 
 export interface User {
   id: number
@@ -10,6 +12,15 @@ export interface User {
   last_login_at: string | null
   /** Set after an administrator issues a temporary password. */
   must_change_password?: boolean
+  /** Null = no Maintenance workspace access (administrators always have it). */
+  maintenance_role?: MaintenanceRole | null
+  /** Workspaces this account may enter. */
+  workspaces?: Workspace[]
+}
+
+/** The signed-in account plus the workspace the current session is bound to. */
+export interface SessionUser extends User {
+  workspace: Workspace
 }
 
 /** User as seen by administrators on the User Management page. */

@@ -82,6 +82,7 @@ test('every sidebar module opens a real page, and sign-out works', async ({ page
   await page.getByRole('button', { name: 'Account menu' }).click()
   await page.getByRole('menuitem', { name: 'Sign out' }).click()
   await expect(page).toHaveURL(/\/login$/)
+  // Signed out, the home URL opens the workspace chooser.
   await page.goto('/')
-  await expect(page).toHaveURL(/\/login$/)
+  await expect(page).toHaveURL(/\/welcome$/)
 })

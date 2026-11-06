@@ -86,6 +86,19 @@ export const ROLE_LABELS: Record<string, string> = {
   viewer: 'Viewer',
 }
 
+export const MAINTENANCE_ROLE_LABELS: Record<string, string> = {
+  manager: 'Maintenance Manager',
+  planner: 'Maintenance Planner',
+  technician: 'Technician',
+  storekeeper: 'Storekeeper',
+  viewer: 'Viewer',
+}
+
+export const WORKSPACE_LABELS = {
+  logistics: 'Logistics Operations',
+  maintenance: 'Maintenance Operations',
+} as const
+
 export const DELAY_CAUSE_LABELS: Record<string, string> = {
   loading_congestion: 'Loading congestion',
   vehicle_breakdown: 'Vehicle breakdown',

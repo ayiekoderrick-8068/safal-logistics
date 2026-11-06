@@ -1,23 +1,32 @@
-import { ChevronDown, KeyRound, LogOut, Menu, Search } from 'lucide-react'
+import { ArrowLeftRight, ChevronDown, KeyRound, LogOut, Menu, Search } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
-import { useAuth } from '../../auth/context'
+import { useAuth, WORKSPACE_LOGIN } from '../../auth/context'
 import { ChangePasswordModal } from '../account/ChangePasswordModal'
+import { SwitchWorkspaceModal } from '../account/SwitchWorkspaceModal'
 import { useToast } from '../ui/toastContext'
-import { initials, ROLE_LABELS } from '../../lib/format'
+import { initials, MAINTENANCE_ROLE_LABELS, ROLE_LABELS, WORKSPACE_LABELS } from '../../lib/format'
+import type { Workspace } from '../../lib/types'
+import { ALL_MAINTENANCE_ITEMS } from '../../maintenanceNav'
 import { ALL_NAV_ITEMS } from '../../nav'
 import { NotificationBell } from './NotificationBell'
 
-export function Topbar({ onToggleNav }: { onToggleNav: () => void }) {
-  const { user, logout, hasRole, updateUser } = useAuth()
+export function Topbar({ workspace = 'logistics', onToggleNav }: { workspace?: Workspace; onToggleNav: () => void }) {
+  const { user, logout, hasRole, canAccess, updateUser } = useAuth()
   const navigate = useNavigate()
   const toast = useToast()
   const [query, setQuery] = useState('')
   const [menuOpen, setMenuOpen] = useState(false)
   const [changingPassword, setChangingPassword] = useState(false)
+  const [switching, setSwitching] = useState(false)
+  const other: Workspace = workspace === 'logistics' ? 'maintenance' : 'logistics'
+  const roleLabel =
+    workspace === 'maintenance'
+      ? MAINTENANCE_ROLE_LABELS[user?.role === 'admin' ? 'manager' : (user?.maintenance_role ?? 'viewer')]
+      : ROLE_LABELS[user?.role ?? 'viewer']
   const signOut = async () => {
     await logout()
-    navigate('/login', { replace: true })
+    navigate(WORKSPACE_LOGIN[workspace], { replace: true })
   }
   // A temporary password issued by an administrator must be replaced before continuing.
   const mustChange = !!user?.must_change_password
@@ -39,7 +48,9 @@ export function Topbar({ onToggleNav }: { onToggleNav: () => void }) {
   }, [menuOpen])
 
   // Module search: jumps to the first page whose name matches. Record search comes later.
-  const pages = ALL_NAV_ITEMS.filter((i) => !i.roles || hasRole(...i.roles))
+  const pages = (workspace === 'maintenance' ? ALL_MAINTENANCE_ITEMS : ALL_NAV_ITEMS).filter(
+    (i) => !i.roles || hasRole(...i.roles),
+  )
   function onSearch(e: FormEvent) {
     e.preventDefault()
     const q = query.trim().toLowerCase()
@@ -71,7 +82,7 @@ export function Topbar({ onToggleNav }: { onToggleNav: () => void }) {
           list="module-list"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search modules, e.g. dispatch…"
+          placeholder={workspace === 'maintenance' ? 'Search modules, e.g. work orders…' : 'Search modules, e.g. dispatch…'}
           className="h-10 w-full rounded-full border border-white/25 bg-white/10 pr-4 pl-10 text-sm text-white placeholder:text-white/75 focus:bg-white/15 focus:outline-none"
         />
         <datalist id="module-list">
@@ -82,7 +93,14 @@ export function Topbar({ onToggleNav }: { onToggleNav: () => void }) {
       </form>
 
       <div className="ml-auto flex items-center gap-3">
-        <NotificationBell />
+        <span
+          className="hidden rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-semibold tracking-wide text-cyan-100 uppercase md:inline-block"
+          data-testid="workspace-name"
+        >
+          {WORKSPACE_LABELS[workspace]}
+        </span>
+        {/* Alerts are logistics data; the maintenance workspace gets its own in a later milestone. */}
+        {workspace === 'logistics' && <NotificationBell />}
 
         <div className="relative" ref={menuRef}>
           <button
@@ -106,8 +124,22 @@ export function Topbar({ onToggleNav }: { onToggleNav: () => void }) {
               <div className="border-b border-line px-3 pt-2 pb-3">
                 <p className="font-semibold">{user.full_name}</p>
                 <p className="truncate text-sm text-ink-muted">{user.email}</p>
-                <p className="mt-1 text-xs font-semibold text-primary">{ROLE_LABELS[user.role]}</p>
+                <p className="mt-1 text-xs font-semibold text-primary">{roleLabel}</p>
+                <p className="text-xs text-ink-muted">{WORKSPACE_LABELS[workspace]}</p>
               </div>
+              {canAccess(other) && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setSwitching(true)
+                  }}
+                  className="mt-1 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-muted"
+                >
+                  <ArrowLeftRight className="size-4" aria-hidden /> Switch to {WORKSPACE_LABELS[other]}
+                </button>
+              )}
               <button
                 type="button"
                 role="menuitem"
@@ -134,6 +166,7 @@ export function Topbar({ onToggleNav }: { onToggleNav: () => void }) {
           )}
         </div>
       </div>
+      {switching && <SwitchWorkspaceModal target={other} onClose={() => setSwitching(false)} />}
       {(changingPassword || mustChange) && (
         <ChangePasswordModal
           required={mustChange}

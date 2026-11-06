@@ -97,6 +97,7 @@ def create_user(body: UserCreate, request: Request, db: DB, admin: Admin) -> Use
         email=email,
         full_name=body.full_name,
         role=body.role,
+        maintenance_role=body.maintenance_role,
         status=UserStatus.ACTIVE,
         password_hash=hash_password(body.temporary_password),
         must_change_password=True,
@@ -111,7 +112,10 @@ def create_user(body: UserCreate, request: Request, db: DB, admin: Admin) -> Use
         actor=admin,
         request=request,
         summary=f"User {user.username} created with role {user.role.value}",
-        changes={"role": user.role.value},
+        changes={
+            "role": user.role.value,
+            "maintenance_role": user.maintenance_role.value if user.maintenance_role else None,
+        },
     )
     db.commit()
     return user
@@ -149,7 +153,13 @@ def update_user(user_id: int, body: UserUpdate, request: Request, db: DB, admin:
     if new_status != user.status:
         changes["status"] = {"from": user.status.value, "to": new_status.value}
         user.status = new_status
-    if "role" in changes or "status" in changes:
+    if "maintenance_role" in fields and body.maintenance_role != user.maintenance_role:
+        changes["maintenance_role"] = {
+            "from": user.maintenance_role.value if user.maintenance_role else None,
+            "to": body.maintenance_role.value if body.maintenance_role else None,
+        }
+        user.maintenance_role = body.maintenance_role
+    if changes.keys() & {"role", "status", "maintenance_role"}:
         revoke_sessions(user)  # access changes take effect immediately
     if changes:
         record_event(

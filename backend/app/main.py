@@ -1,9 +1,11 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
 from .config import get_settings
+from .deps import require_workspace
 from .middleware import SecurityHeadersMiddleware
+from .models import Workspace
 from .routers import (
     alerts,
     analytics,
@@ -14,10 +16,15 @@ from .routers import (
     fleet,
     incidents,
     loading,
+    maintenance,
     reports,
     system,
     users,
 )
+
+# Each session is bound to one workspace; these guards make the API refuse the other one.
+LOGISTICS = [Depends(require_workspace(Workspace.LOGISTICS))]
+MAINTENANCE = [Depends(require_workspace(Workspace.MAINTENANCE))]
 
 
 def create_app() -> FastAPI:
@@ -39,18 +46,25 @@ def create_app() -> FastAPI:
         allow_headers=["Content-Type", "Authorization"],
     )
     app.add_middleware(SecurityHeadersMiddleware)  # outermost: also covers CORS/413 replies
+    # Shared by both workspaces: health/meta, authentication, user administration (admin-only).
     app.include_router(system.router)
     app.include_router(auth.router)
-    app.include_router(dashboard.router)
-    app.include_router(fleet.router)
-    app.include_router(loading.router)
-    app.include_router(dispatch.router)
-    app.include_router(compliance.router)
-    app.include_router(incidents.router)
-    app.include_router(alerts.router)
-    app.include_router(analytics.router)
-    app.include_router(reports.router)
     app.include_router(users.router)
+    # Logistics Operations
+    for module in (
+        dashboard,
+        fleet,
+        loading,
+        dispatch,
+        compliance,
+        incidents,
+        alerts,
+        analytics,
+        reports,
+    ):
+        app.include_router(module.router, dependencies=LOGISTICS)
+    # Maintenance Operations
+    app.include_router(maintenance.router, dependencies=MAINTENANCE)
     return app
 
 

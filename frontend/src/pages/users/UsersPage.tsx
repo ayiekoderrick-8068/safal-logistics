@@ -14,7 +14,7 @@ import { useToast } from '../../components/ui/toastContext'
 import { useApi } from '../../hooks/useApi'
 import { useDebounced } from '../../hooks/useDebounced'
 import { api } from '../../lib/api'
-import { formatDateTime, formatNumber, ROLE_LABELS } from '../../lib/format'
+import { formatDateTime, formatNumber, MAINTENANCE_ROLE_LABELS, ROLE_LABELS } from '../../lib/format'
 import type { AdminUser } from '../../lib/types'
 import { ResetPasswordModal, UserFormModal } from './UserModals'
 
@@ -104,10 +104,10 @@ export function UsersPage() {
           <EmptyState title={q || role || status ? 'No users match your filters' : 'No users yet'} />
         ) : (
           <div className="-mx-2 overflow-x-auto">
-            <table className="w-full min-w-[820px] text-left text-sm whitespace-nowrap">
+            <table className="w-full min-w-[940px] text-left text-sm whitespace-nowrap">
               <thead>
                 <tr className="bg-surface-muted text-ink">
-                  {['Name', 'Username', 'Role', 'Status', 'Last sign-in', 'Actions'].map((h) => (
+                  {['Name', 'Username', 'Role', 'Maintenance', 'Status', 'Last sign-in', 'Actions'].map((h) => (
                     <th key={h} scope="col" className="px-3 py-2.5 font-semibold first:rounded-l-xl last:rounded-r-xl">{h}</th>
                   ))}
                 </tr>
@@ -123,6 +123,13 @@ export function UsersPage() {
                       </td>
                       <td className="px-3 py-2.5">{u.username}</td>
                       <td className="px-3 py-2.5">{ROLE_LABELS[u.role]}</td>
+                      <td className="px-3 py-2.5">
+                        {u.role === 'admin'
+                          ? MAINTENANCE_ROLE_LABELS.manager
+                          : u.maintenance_role
+                            ? MAINTENANCE_ROLE_LABELS[u.maintenance_role]
+                            : <span className="text-ink-muted">No access</span>}
+                      </td>
                       <td className="px-3 py-2.5">
                         <StatusBadge status={u.status} />
                         {u.must_change_password && (

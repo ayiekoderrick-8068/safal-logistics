@@ -118,7 +118,7 @@ describe('login flow', () => {
 
     const [url, init] = fetchMock.mock.calls[1]
     expect(url).toBe('/api/auth/login')
-    expect(JSON.parse(init.body)).toEqual({ username: 'derrick', password: 'Secret-123!' })
+    expect(JSON.parse(init.body)).toEqual({ username: 'derrick', password: 'Secret-123!', workspace: 'logistics' })
   })
 
   it('hides admin-only modules from other roles', async () => {

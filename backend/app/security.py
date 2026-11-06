@@ -43,13 +43,16 @@ def verify_against_dummy(password: str) -> None:
     verify_password(password, _DUMMY_HASH)
 
 
-def create_access_token(user_id: int, role: str, token_version: int = 0) -> str:
+def create_access_token(
+    user_id: int, role: str, token_version: int = 0, workspace: str = "logistics"
+) -> str:
     settings = get_settings()
     now = datetime.now(UTC)
     payload: dict[str, Any] = {
         "sub": str(user_id),
         "role": role,
         "tv": token_version,  # must equal users.token_version, or the session is revoked
+        "ws": workspace,  # the one workspace this session may use
         "iat": now,
         "exp": now + timedelta(minutes=settings.access_token_minutes),
     }

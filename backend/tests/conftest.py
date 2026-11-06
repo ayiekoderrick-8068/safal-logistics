@@ -33,7 +33,7 @@ from sqlalchemy.orm import Session  # noqa: E402
 from alembic import command  # noqa: E402
 from app.db import SessionLocal, get_engine  # noqa: E402
 from app.main import create_app  # noqa: E402
-from app.models import Role, User, UserStatus  # noqa: E402
+from app.models import MaintenanceRole, Role, User, UserStatus  # noqa: E402
 from app.security import hash_password  # noqa: E402
 from app.services.compliance import default_requirement_rows  # noqa: E402
 
@@ -105,6 +105,7 @@ def make_user(db: Session) -> Callable[..., User]:
         role: Role = Role.ADMIN,
         status: UserStatus = UserStatus.ACTIVE,
         password: str = TEST_PASSWORD,
+        maintenance_role: MaintenanceRole | None = None,
     ) -> User:
         user = User(
             username=username,
@@ -113,6 +114,7 @@ def make_user(db: Session) -> Callable[..., User]:
             password_hash=hash_password(password),
             role=role,
             status=status,
+            maintenance_role=maintenance_role,
         )
         db.add(user)
         db.commit()

@@ -1,19 +1,27 @@
 import clsx from 'clsx'
-import { BarChart3, Truck, X } from 'lucide-react'
+import { BarChart3, Cog, Truck, X } from 'lucide-react'
 import { NavLink } from 'react-router'
-import { useAuth } from '../../auth/context'
+import { useAuth, WORKSPACE_HOME } from '../../auth/context'
+import { WORKSPACE_LABELS } from '../../lib/format'
+import type { Workspace } from '../../lib/types'
+import { MAINTENANCE_NAV } from '../../maintenanceNav'
 import { NAV } from '../../nav'
 
 export function Sidebar({
+  workspace = 'logistics',
   collapsed,
   mobileOpen,
   onClose,
 }: {
+  workspace?: Workspace
   collapsed: boolean
   mobileOpen: boolean
   onClose: () => void
 }) {
   const { hasRole } = useAuth()
+  const sections = workspace === 'maintenance' ? MAINTENANCE_NAV : NAV
+  const home = WORKSPACE_HOME[workspace]
+  const FooterIcon = workspace === 'maintenance' ? Cog : BarChart3
 
   return (
     <>
@@ -47,7 +55,7 @@ export function Sidebar({
         </div>
 
         <nav aria-label="Main navigation" className="flex-1 overflow-y-auto px-3 pb-4">
-          {NAV.map((section) => {
+          {sections.map((section) => {
             const items = section.items.filter((item) => !item.roles || hasRole(...item.roles))
             if (items.length === 0) return null
             return (
@@ -65,7 +73,7 @@ export function Sidebar({
                     <li key={item.to}>
                       <NavLink
                         to={item.to}
-                        end={item.to === '/'}
+                        end={item.to === home}
                         onClick={onClose}
                         title={collapsed ? item.label : undefined}
                         className={({ isActive }) =>
@@ -90,11 +98,11 @@ export function Sidebar({
         <div className={clsx('m-4 rounded-2xl border border-white/10 bg-white/5 p-3', collapsed && 'lg:hidden')}>
           <div className="flex items-center gap-3">
             <span className="grid size-10 place-items-center rounded-lg bg-sky-500/30 text-cyan-200">
-              <BarChart3 className="size-5" aria-hidden />
+              <FooterIcon className="size-5" aria-hidden />
             </span>
             <div>
               <p className="text-sm font-semibold">LogiTrack v{__APP_VERSION__}</p>
-              <p className="text-xs text-white/75">Logistics Operations</p>
+              <p className="text-xs text-white/75">{WORKSPACE_LABELS[workspace]}</p>
             </div>
           </div>
         </div>

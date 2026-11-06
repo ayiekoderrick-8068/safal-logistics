@@ -55,6 +55,24 @@ class Role(enum.StrEnum):
     VIEWER = "viewer"
 
 
+class MaintenanceRole(enum.StrEnum):
+    """Role inside the Maintenance workspace. A user without one has no maintenance access
+    (administrators always have full access to both workspaces)."""
+
+    MANAGER = "manager"
+    PLANNER = "planner"
+    TECHNICIAN = "technician"
+    STOREKEEPER = "storekeeper"
+    VIEWER = "viewer"
+
+
+class Workspace(enum.StrEnum):
+    """Each session is bound to exactly one workspace; switching needs the password again."""
+
+    LOGISTICS = "logistics"
+    MAINTENANCE = "maintenance"
+
+
 class UserStatus(enum.StrEnum):
     ACTIVE = "active"
     PENDING = "pending"
@@ -166,6 +184,24 @@ class User(TimestampMixin, Base):
         Boolean, default=False, server_default=text("false")
     )
     password_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # NULL = no access to the Maintenance workspace (administrators are always allowed).
+    maintenance_role: Mapped[MaintenanceRole | None] = mapped_column(
+        _enum(MaintenanceRole, "maintenance_role"), nullable=True
+    )
+
+    def can_access(self, workspace: Workspace) -> bool:
+        if workspace is Workspace.LOGISTICS:
+            return True  # every account has a logistics role
+        return self.role == Role.ADMIN or self.maintenance_role is not None
+
+    @property
+    def effective_maintenance_role(self) -> MaintenanceRole | None:
+        """Administrators act as maintenance managers."""
+        return MaintenanceRole.MANAGER if self.role == Role.ADMIN else self.maintenance_role
+
+    @property
+    def workspaces(self) -> list[Workspace]:
+        return [w for w in Workspace if self.can_access(w)]
 
 
 class Driver(TimestampMixin, Base):

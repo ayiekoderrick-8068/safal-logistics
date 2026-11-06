@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .models import DispatchStatus, DocumentType, Role, UserStatus
+from .models import DispatchStatus, DocumentType, MaintenanceRole, Role, UserStatus, Workspace
 
 
 class ORMModel(BaseModel):
@@ -13,6 +13,12 @@ class ORMModel(BaseModel):
 # ---------- Auth ----------
 class LoginRequest(BaseModel):
     username: str = Field(min_length=1, max_length=255, description="Username or email")
+    password: str = Field(min_length=1, max_length=128)
+    workspace: Workspace = Workspace.LOGISTICS
+
+
+class SwitchWorkspaceRequest(BaseModel):
+    workspace: Workspace
     password: str = Field(min_length=1, max_length=128)
 
 
@@ -25,10 +31,18 @@ class UserOut(ORMModel):
     status: UserStatus
     last_login_at: datetime | None
     must_change_password: bool = False
+    maintenance_role: MaintenanceRole | None = None
+    workspaces: list[Workspace] = []
+
+
+class SessionUserOut(UserOut):
+    """The signed-in account plus the workspace this session is bound to."""
+
+    workspace: Workspace
 
 
 class LoginResponse(BaseModel):
-    user: UserOut
+    user: SessionUserOut
     expires_in_seconds: int
 
 
@@ -51,6 +65,7 @@ class UserCreate(BaseModel):
     email: str = Field(min_length=3, max_length=255)
     full_name: str = Field(min_length=2, max_length=120)
     role: Role
+    maintenance_role: MaintenanceRole | None = None
     temporary_password: str = Field(min_length=1, max_length=128)
 
     @field_validator("username", mode="before")
@@ -67,6 +82,8 @@ class UserCreate(BaseModel):
 class UserUpdate(BaseModel):
     full_name: str | None = Field(default=None, min_length=2, max_length=120)
     role: Role | None = None
+    # Send null to remove maintenance access; omit to leave it unchanged.
+    maintenance_role: MaintenanceRole | None = None
     status: Literal["active", "deactivated"] | None = None
 
 

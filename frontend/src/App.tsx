@@ -6,10 +6,12 @@ import { RequireAuth } from './auth/RequireAuth'
 import { AppLayout } from './components/layout/AppLayout'
 import { LoadingState } from './components/ui/States'
 import { ToastProvider } from './components/ui/Toast'
+import { ALL_MAINTENANCE_ITEMS } from './maintenanceNav'
 import { ALL_NAV_ITEMS, type NavItem } from './nav'
-import { LoginPage } from './pages/LoginPage'
+import { LoginPage, MaintenanceLoginPage } from './pages/LoginPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { PlannedModulePage } from './pages/PlannedModulePage'
+import { WelcomePage } from './pages/WelcomePage'
 
 // Charting code is heavy: load module pages only when they are opened.
 const OverviewPage = lazy(() => import('./pages/overview/OverviewPage').then((m) => ({ default: m.OverviewPage })))
@@ -48,11 +50,34 @@ function ModuleRoute({ item }: { item: NavItem }) {
 export function AppRoutes() {
   return (
     <Routes>
+      <Route path="/welcome" element={<WelcomePage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/maintenance/login" element={<MaintenanceLoginPage />} />
+
+      {/* Maintenance Operations: its own session; the API refuses logistics sessions here. */}
+      <Route
+        path="/maintenance"
+        element={
+          <RequireAuth workspace="maintenance">
+            <AppLayout workspace="maintenance" />
+          </RequireAuth>
+        }
+      >
+        {ALL_MAINTENANCE_ITEMS.filter((i) => i.planned).map((item) =>
+          item.to === '/maintenance' ? (
+            <Route key={item.to} index element={<ModuleRoute item={item} />} />
+          ) : (
+            <Route key={item.to} path={item.to.slice('/maintenance/'.length)} element={<ModuleRoute item={item} />} />
+          ),
+        )}
+        <Route path="*" element={<NotFoundPage />} />
+      </Route>
+
+      {/* Logistics Operations */}
       <Route
         element={
-          <RequireAuth>
-            <AppLayout />
+          <RequireAuth workspace="logistics">
+            <AppLayout workspace="logistics" />
           </RequireAuth>
         }
       >

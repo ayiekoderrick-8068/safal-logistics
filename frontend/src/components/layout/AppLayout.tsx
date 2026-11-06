@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router'
+import type { Workspace } from '../../lib/types'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 
-export function AppLayout() {
+export function AppLayout({ workspace = 'logistics' }: { workspace?: Workspace }) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -20,9 +21,14 @@ export function AppLayout() {
       >
         Skip to content
       </a>
-      <Sidebar collapsed={collapsed} mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
+      <Sidebar
+        workspace={workspace}
+        collapsed={collapsed}
+        mobileOpen={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+      />
       <div className="flex min-w-0 flex-1 flex-col bg-topbar">
-        <Topbar onToggleNav={toggleNav} />
+        <Topbar workspace={workspace} onToggleNav={toggleNav} />
         <main
           id="main"
           className="workspace-gradient flex-1 px-4 py-5 md:px-6 md:py-6 lg:rounded-tl-[28px]"

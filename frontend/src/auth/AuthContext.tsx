@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { api, ApiError, setUnauthorizedHandler } from '../lib/api'
-import type { Role, User } from '../lib/types'
+import type { Role, SessionUser, User, Workspace } from '../lib/types'
 import { AuthContext, type AuthStatus } from './context'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<SessionUser | null>(null)
   const [status, setStatus] = useState<AuthStatus>('loading')
   const [sessionExpired, setSessionExpired] = useState(false)
   const statusRef = useRef<AuthStatus>('loading')
@@ -14,7 +14,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false
-    api<User>('/auth/me')
+    api<SessionUser>('/auth/me')
       .then((u) => {
         if (!cancelled) {
           setUser(u)
@@ -41,14 +41,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => setUnauthorizedHandler(null)
   }, [])
 
-  const login = useCallback(async (username: string, password: string) => {
-    const res = await api<{ user: User }>('/auth/login', {
+  const login = useCallback(async (username: string, password: string, workspace: Workspace = 'logistics') => {
+    const res = await api<{ user: SessionUser }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, workspace }),
     })
     setUser(res.user)
     setSessionExpired(false)
     setStatus('authenticated')
+    return res.user
+  }, [])
+
+  const switchWorkspace = useCallback(async (workspace: Workspace, password: string) => {
+    const res = await api<{ user: SessionUser }>('/auth/switch-workspace', {
+      method: 'POST',
+      body: JSON.stringify({ workspace, password }),
+    })
+    setUser(res.user)
     return res.user
   }, [])
 
@@ -67,12 +76,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [user],
   )
 
-  // After a password change the server returns the updated account.
-  const updateUser = useCallback((u: User) => setUser(u), [])
+  const canAccess = useCallback(
+    (ws: Workspace) =>
+      !!user && (user.workspaces ? user.workspaces.includes(ws) : ws === 'logistics'),
+    [user],
+  )
 
+  // After a password change the server returns the updated account (same session/workspace).
+  const updateUser = useCallback(
+    (u: User) => setUser((prev) => ({ ...u, workspace: prev?.workspace ?? 'logistics' })),
+    [],
+  )
+
+  // A response without a workspace (older server) is a logistics session.
+  const workspace: Workspace | null = user ? (user.workspace ?? 'logistics') : null
   const value = useMemo(
-    () => ({ status, user, sessionExpired, login, logout, hasRole, updateUser }),
-    [status, user, sessionExpired, login, logout, hasRole, updateUser],
+    () => ({
+      status, user, workspace, sessionExpired, login, switchWorkspace, logout, hasRole, canAccess, updateUser,
+    }),
+    [status, user, workspace, sessionExpired, login, switchWorkspace, logout, hasRole, canAccess, updateUser],
   )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
