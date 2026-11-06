@@ -22,6 +22,9 @@ import { z } from 'zod'
 import fleetJpg from '../assets/login/fleet-highway.jpg'
 import fleet480 from '../assets/login/fleet-highway-480.webp'
 import fleet736 from '../assets/login/fleet-highway-736.webp'
+import controlRoomJpg from '../assets/login/maintenance-control-room.jpg'
+import controlRoom480 from '../assets/login/maintenance-control-room-480.webp'
+import controlRoom736 from '../assets/login/maintenance-control-room-736.webp'
 import { useAuth, WORKSPACE_HOME } from '../auth/context'
 import TextType from '../components/reactbits/TextType/TextType'
 import { ApiError } from '../lib/api'
@@ -76,13 +79,22 @@ const LOGISTICS_LOGIN: LoginConfig = {
   ],
 }
 
-/** Option C: minimal. Photo to be supplied; until then a plain dark-teal hero, no cards. */
+/** Option C: minimal — the control-room photograph and the headline, no feature cards. */
 const MAINTENANCE_LOGIN: LoginConfig = {
   workspace: 'maintenance',
   label: 'Maintenance operations',
   phrases: ['Reliable equipment.', 'Preventive maintenance.', 'Measurable uptime.'],
   colors: ['#ffffff', '#ffffff', '#67e8f9'],
-  heroHeight: 'h-56 sm:h-72',
+  photo: {
+    jpg: controlRoomJpg,
+    webp480: controlRoom480,
+    webp736: controlRoom736,
+    width: 736,
+    height: 1307,
+    // Low percentages keep the plant skyline behind the headline and the engineers below it.
+    position: 'object-[center_10%] sm:object-[center_20%] lg:object-[center_15%]',
+  },
+  heroHeight: 'h-80 sm:h-[27rem]',
 }
 
 const YEAR = new Date().getFullYear()
