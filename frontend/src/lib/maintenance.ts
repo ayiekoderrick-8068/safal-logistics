@@ -190,6 +190,14 @@ export type MaintenancePermission =
 interface Access {
   maintenance_role: MaintenanceRole
   permissions: MaintenancePermission[]
+  sample_data?: boolean
+}
+
+/** MTBF-style durations: hours from 1 h up, minutes below, so a short value never reads "0 h". */
+export function hoursOrMinutes(hours: number): string {
+  if (hours >= 1) return `${new Intl.NumberFormat('en-KE', { maximumFractionDigits: 1 }).format(hours)} h`
+  const minutes = Math.round(hours * 60)
+  return minutes < 1 ? '< 1 min' : `${minutes} min`
 }
 
 /** The caller's maintenance permissions, from the API (which also enforces them). */
@@ -197,6 +205,7 @@ export function useMaintenanceAccess() {
   const { data } = useApi<Access>('/maintenance/access')
   return {
     role: data?.maintenance_role,
+    sampleData: !!data?.sample_data,
     can: (p: MaintenancePermission) => !!data?.permissions.includes(p),
   }
 }
@@ -395,6 +404,82 @@ export const newRequestId = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
+
+// ---------- Analytics ----------
+export interface MaintenanceKpis {
+  window: { start: string; end: string; days: number }
+  equipment: number
+  availability: { pct: number | null; observed_hours: number; downtime_minutes: number }
+  mtbf: { hours: number | null; failures: number; operating_hours: number }
+  mttr: { minutes: number | null; repairs: number }
+  time_to_restore: { minutes: number | null; restorations: number }
+  pm_compliance: { due: number; on_time: number; late: number; missed: number; pct: number | null }
+  work_order_completion: { pct: number | null; raised: number; completed: number }
+  definitions: string[]
+}
+
+export interface MaintenanceDashboard {
+  window_days: number
+  kpis: {
+    equipment_total: number
+    operational: number
+    under_maintenance: number
+    out_of_service: number
+    open_work_orders: number
+    overdue_tasks: number
+    overdue_pm_tasks: number
+    overdue_work_orders: number
+    scheduled_pm_next_30_days: number
+    downtime_minutes: number
+    completion_rate_pct: number | null
+    completion_sample: number
+  }
+  schedule: { overdue: number; due_today: number; next_7_days: number }
+  work_orders: { open: number; assigned: number; in_progress: number; awaiting_parts: number; completed_in_window: number }
+  metrics: Pick<MaintenanceKpis, 'availability' | 'mtbf' | 'mttr' | 'pm_compliance'>
+  top_failing: { code: string; name: string; breakdowns: number; downtime_minutes: number }[]
+  fault_categories: { category: FaultCategory; breakdowns: number; downtime_minutes: number }[]
+  downtime_trend: { day: string; downtime_minutes: number }[]
+  recent_activity: {
+    id: number
+    occurred_at: string
+    kind: string
+    summary: string
+    equipment: EquipmentRef
+    actor: string | null
+  }[]
+  definitions: string[]
+}
+
+export interface EquipmentAnalyticsRow {
+  equipment_id: number
+  code: string
+  name: string
+  facility: string
+  status: EquipmentStatus
+  breakdowns: number
+  failures: number
+  downtime_minutes: number
+  observed_hours: number
+  availability_pct: number | null
+  mtbf_hours: number | null
+  repairs: number
+  mttr_minutes: number | null
+  pm_due: number
+  pm_on_time: number
+  pm_compliance_pct: number | null
+}
+
+export interface ReportPreview {
+  key: string
+  title: string
+  description: string
+  window: { start: string; end: string }
+  columns: { label: string; key: string }[]
+  rows: Record<string, string | number | null>[]
+  total: number
+  kpis: MaintenanceKpis
+}
 
 /** Fired after any change that can move maintenance counts (e.g. the top-bar alert). */
 export const MAINTENANCE_CHANGED = 'logitrack:maintenance-changed'

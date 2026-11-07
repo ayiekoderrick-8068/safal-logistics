@@ -6,6 +6,7 @@ from ..config import get_settings
 from ..models import AppSetting
 
 SAMPLE_DATA_KEY = "sample_data"
+MAINTENANCE_SAMPLE_KEY = "maintenance_sample_data"  # the maintenance workspace has its own flag
 TURNAROUND_TARGET_KEY = "turnaround_target_minutes"
 
 
@@ -30,6 +31,11 @@ def delete_setting(db: Session, key: str) -> None:
 
 def is_sample_data(db: Session) -> bool:
     value = get_setting(db, SAMPLE_DATA_KEY)
+    return bool(isinstance(value, dict) and value.get("loaded"))
+
+
+def is_maintenance_sample(db: Session) -> bool:
+    value = get_setting(db, MAINTENANCE_SAMPLE_KEY)
     return bool(isinstance(value, dict) and value.get("loaded"))
 
 

@@ -1,7 +1,10 @@
 import { FlaskConical } from 'lucide-react'
 
 /** Shown whenever the API reports the database holds the demonstration dataset. */
-export function SampleDataBanner() {
+export function SampleDataBanner({
+  subject = 'operations',
+  command = 'clear-sample',
+}: { subject?: string; command?: string }) {
   return (
     <div
       role="note"
@@ -11,8 +14,8 @@ export function SampleDataBanner() {
       <FlaskConical className="mt-0.5 size-5 shrink-0 text-amber-600" aria-hidden />
       <p>
         <strong className="font-semibold">Sample data.</strong> These figures are calculated from a
-        demonstration dataset, not live operations. An administrator can remove it with{' '}
-        <code className="rounded bg-amber-100 px-1">python -m app.cli clear-sample --yes</code>.
+        demonstration dataset, not live {subject}. An administrator can remove it with{' '}
+        <code className="rounded bg-amber-100 px-1 break-all">python -m app.cli {command} --yes</code>.
       </p>
     </div>
   )

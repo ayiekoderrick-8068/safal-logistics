@@ -1,8 +1,16 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router'
+import { useMaintenanceAccess } from '../../lib/maintenance'
 import type { Workspace } from '../../lib/types'
+import { SampleDataBanner } from '../ui/SampleDataBanner'
 import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
+
+/** Every maintenance page says so while the demonstration dataset is loaded. */
+function MaintenanceSampleBanner() {
+  const { sampleData } = useMaintenanceAccess()
+  return sampleData ? <SampleDataBanner subject="maintenance records" command="clear-maintenance-sample" /> : null
+}
 
 export function AppLayout({ workspace = 'logistics' }: { workspace?: Workspace }) {
   const [collapsed, setCollapsed] = useState(false)
@@ -33,6 +41,7 @@ export function AppLayout({ workspace = 'logistics' }: { workspace?: Workspace }
           id="main"
           className="workspace-gradient flex-1 px-4 py-5 md:px-6 md:py-6 lg:rounded-tl-[28px]"
         >
+          {workspace === 'maintenance' && <MaintenanceSampleBanner />}
           <Outlet />
         </main>
       </div>

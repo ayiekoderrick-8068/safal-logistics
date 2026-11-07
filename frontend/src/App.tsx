@@ -30,6 +30,12 @@ const UsersPage = lazy(() => import('./pages/users/UsersPage').then((m) => ({ de
 const ComplianceRecordsPage = lazy(() =>
   import('./pages/compliance/ComplianceRecordsPage').then((m) => ({ default: m.ComplianceRecordsPage })),
 )
+const MaintenanceDashboardPage = lazy(() =>
+  import('./pages/maintenance/analytics/MaintenanceDashboardPage').then((m) => ({ default: m.MaintenanceDashboardPage })),
+)
+const MaintenanceReportsPage = lazy(() =>
+  import('./pages/maintenance/analytics/MaintenanceReportsPage').then((m) => ({ default: m.MaintenanceReportsPage })),
+)
 const SparePartsPage = lazy(() =>
   import('./pages/maintenance/parts/SparePartsPage').then((m) => ({ default: m.SparePartsPage })),
 )
@@ -78,6 +84,8 @@ export function AppRoutes() {
           </RequireAuth>
         }
       >
+        <Route index element={<Lazy><MaintenanceDashboardPage /></Lazy>} />
+        <Route path="reports" element={<Lazy><MaintenanceReportsPage /></Lazy>} />
         <Route path="equipment" element={<Lazy><EquipmentPage /></Lazy>} />
         <Route path="preventive" element={<Lazy><PreventivePage /></Lazy>} />
         <Route path="work-orders" element={<Lazy><WorkOrdersPage /></Lazy>} />

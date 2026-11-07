@@ -49,3 +49,4 @@ ignore = ["B008"]
 "tests/*" = ["S101", "S105", "S106", "F811", "E501"]  # F811: shared pytest fixtures are imported
 "app/services/pdf_reports.py" = ["E501"]  # long report copy and table definitions
 "app/sample_data.py" = ["S311"]
+"app/maintenance_sample.py" = ["S311"]  # deterministic demo data, not security-sensitive

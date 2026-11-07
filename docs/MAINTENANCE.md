@@ -12,7 +12,7 @@ design; it is updated as each milestone lands.
 | 3 — Scheduling | Preventive-maintenance plans, recurring tasks, overdue flags | Done |
 | 4 — Work orders | Work-order lifecycle, breakdown tracking, repair records | Done |
 | 5 — Spare parts | Inventory, consumption, reorder alerts | Done |
-| 6 — Analytics | Dashboard KPIs, MTTR, MTBF, PM compliance, availability, exports | Planned |
+| 6 — Analytics | Dashboard KPIs, MTTR, MTBF, PM compliance, availability, exports | Done |
 | 7 — Quality | End-to-end, security and responsive testing; documentation | Planned |
 
 Until a module is built its page says so and shows no figures.
@@ -227,7 +227,62 @@ API under `/api/maintenance`: `GET /parts` (search, `stock=low|out|attention`, c
 `POST /work-orders/{id}/parts/return`. Catalogue, receipts and counts need `parts.manage`;
 issues and returns `parts.consume`.
 
+## Dashboard, analytics and reports (Milestone 6)
+
+Calculations live in `backend/app/services/maintenance_analytics.py`; every figure is computed
+from the records above when the page is opened (no stored or sample figures). The same
+definitions are shown on the dashboard, on the Reports page and in every export.
+
+* **Reporting window**: whole local days (operations timezone), clipped to now; at most 367
+  days. The dashboard offers the last 7, 30 or 90 days; Reports takes any From / To dates and
+  an optional facility.
+* **Downtime**: minutes a breakdown that stopped the asset was open, clipped to the window.
+  Breakdowns that did not stop the asset count as events but add no downtime.
+* **Observed time**: window time since the asset was registered, or since its first recorded
+  breakdown if that started earlier (an asset registered after it failed), so downtime never
+  exceeds observed time. There is no shift calendar: equipment is assumed to be scheduled
+  24 h a day. Archived assets count until they were archived.
+* **Availability** = (observed − downtime) ÷ observed.
+* **MTBF** = operating time ÷ failures (stopping breakdowns that started in the window).
+  Calendar-based, because there are no run-hour meters.
+* **MTTR** = mean start-to-completion time of corrective work orders completed in the window
+  (includes time awaiting parts). **Mean time to restore** = mean downtime of breakdowns
+  restored in the window.
+* **PM compliance** = preventive tasks due in the window (before today, cancelled excluded)
+  completed on or before their due date. Late and missed tasks are shown separately.
+* **Work-order completion** = work orders raised in the window that are completed (cancelled
+  excluded).
+* **Insufficient data.** Each metric carries its sample size. With no failures, repairs, due
+  tasks or operating time the value is null and the UI says "Insufficient data" (never 0 %
+  or 100 %). Per-asset cells show "n/a".
+
+**Dashboard** (`/maintenance`): equipment counts by status, open and overdue work, scheduled
+PM, downtime, completion rate, the four reliability metrics, equipment health, the PM
+schedule (linking to the filtered Preventive page), the work-order pipeline, the daily
+downtime trend, most frequently failing assets, common fault categories and recent activity.
+Every chart has a Table view; colours carry labels, so meaning never depends on colour alone.
+
+**Reports** (`/maintenance/reports`): window and facility filters, KPI cards, availability
+by equipment, and seven reports: equipment downtime and availability, maintenance history,
+fault frequency, repair duration, PM completion, spare-parts consumption and overdue work
+orders (current, not windowed). The preview shows up to 500 rows. Exports:
+
+* **CSV** (UTF-8 with BOM, a commented header of report, window, facility and definitions),
+  **Excel** (.xlsx; refused with a message above the shared export row limit) and **PDF** (A4 landscape with KPI
+  summary, definitions and page numbers; up to 300 rows, and it says when rows were cut).
+* Cells starting with `=`, `+`, `-` or `@` are neutralised against spreadsheet formula
+  injection.
+* Viewing needs `view`; exporting needs `reports.export` (manager, planner, storekeeper), and
+  each export is recorded in the audit log. The page hides the export buttons for roles
+  without it, and the API refuses them (403).
+
+API under `/api/maintenance`: `GET /dashboard?days=7..365`,
+`GET /analytics?start&end&facility` (KPIs and per-asset rows), `GET /reports`,
+`GET /reports/{key}?start&end&facility&format=json|csv|xlsx|pdf`. Bad windows return 422.
+
 ## Migrations
+
+Milestone 6 adds no tables.
 
 `f7b1d4e5a6c8` creates the spare-part and stock-movement tables (new tables only).
 

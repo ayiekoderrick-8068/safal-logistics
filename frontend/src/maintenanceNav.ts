@@ -18,14 +18,6 @@ export const MAINTENANCE_NAV: NavSection[] = [
       {
         to: '/maintenance', label: 'Dashboard', title: 'Maintenance Dashboard', icon: LayoutDashboard,
         description: 'Equipment health, schedules, work orders and breakdowns at a glance.',
-        planned: {
-          milestone: 'Milestone 6',
-          features: [
-            'Live KPIs from the equipment, schedule and work-order records',
-            'Equipment health, maintenance schedule and work-order overview',
-            'Breakdown analysis and recent activity',
-          ],
-        },
       },
       {
         to: '/maintenance/equipment', label: 'Equipment', title: 'Equipment Register', icon: Wrench,
@@ -51,10 +43,6 @@ export const MAINTENANCE_NAV: NavSection[] = [
       {
         to: '/maintenance/reports', label: 'Reports', title: 'Maintenance Reports', icon: FileText,
         description: 'MTTR, MTBF, PM compliance, availability and exports.',
-        planned: {
-          milestone: 'Milestone 6',
-          features: ['Documented MTTR, MTBF, PM compliance and availability', 'CSV, Excel and PDF exports'],
-        },
       },
       {
         to: '/maintenance/settings', label: 'Settings', title: 'Maintenance Settings', icon: Settings,

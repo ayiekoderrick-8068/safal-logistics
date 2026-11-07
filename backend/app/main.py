@@ -17,6 +17,7 @@ from .routers import (
     incidents,
     loading,
     maintenance,
+    maintenance_analytics,
     maintenance_equipment,
     maintenance_parts,
     maintenance_pm,
@@ -74,6 +75,7 @@ def create_app() -> FastAPI:
         maintenance_pm,
         maintenance_work,
         maintenance_parts,
+        maintenance_analytics,
     ):
         app.include_router(module.router, dependencies=MAINTENANCE)
     return app

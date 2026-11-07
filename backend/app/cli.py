@@ -4,6 +4,8 @@ r"""Management commands.
         --email you@example.com --name "Your Name"
     uv run python -m app.cli load-sample
     uv run python -m app.cli clear-sample --yes
+    uv run python -m app.cli load-maintenance-sample
+    uv run python -m app.cli clear-maintenance-sample --yes
 
     uv run python -m app.cli set-password --username derrick
 
@@ -94,6 +96,35 @@ def clear_sample(args: argparse.Namespace) -> int:
             print(exc, file=sys.stderr)
             return 1
     print("Sample data removed.")
+    return 0
+
+
+def load_maintenance_sample_cmd(_: argparse.Namespace) -> int:
+    from .maintenance_sample import load_maintenance_sample
+
+    with SessionLocal() as db:
+        try:
+            counts = load_maintenance_sample(db)
+        except RuntimeError as exc:
+            print(exc, file=sys.stderr)
+            return 1
+    print(f"Maintenance sample data loaded (clearly flagged in the UI): {counts}")
+    return 0
+
+
+def clear_maintenance_sample_cmd(args: argparse.Namespace) -> int:
+    from .maintenance_sample import clear_maintenance_sample
+
+    if not args.yes:
+        print("Pass --yes to confirm deleting the maintenance sample dataset.", file=sys.stderr)
+        return 2
+    with SessionLocal() as db:
+        try:
+            clear_maintenance_sample(db)
+        except RuntimeError as exc:
+            print(exc, file=sys.stderr)
+            return 1
+    print("Maintenance sample data removed.")
     return 0
 
 
@@ -208,6 +239,14 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("clear-sample", help="Delete the sample dataset")
     p.add_argument("--yes", action="store_true")
     p.set_defaults(func=clear_sample)
+
+    sub.add_parser(
+        "load-maintenance-sample", help="Load the labelled maintenance sample dataset"
+    ).set_defaults(func=load_maintenance_sample_cmd)
+
+    p = sub.add_parser("clear-maintenance-sample", help="Delete the maintenance sample dataset")
+    p.add_argument("--yes", action="store_true")
+    p.set_defaults(func=clear_maintenance_sample_cmd)
 
     sub.add_parser("refresh-alerts", help="Re-evaluate operational alerts (for cron)").set_defaults(
         func=refresh_alerts_cmd
