@@ -10,7 +10,6 @@ import {
   LockKeyhole,
   ShieldCheck,
   Timer,
-  Truck,
   TriangleAlert,
   Warehouse,
   type LucideIcon,
@@ -26,6 +25,7 @@ import controlRoomJpg from '../assets/login/maintenance-control-room.jpg'
 import controlRoom480 from '../assets/login/maintenance-control-room-480.webp'
 import controlRoom736 from '../assets/login/maintenance-control-room-736.webp'
 import { useAuth, WORKSPACE_HOME } from '../auth/context'
+import { Logo } from '../components/brand/Logo'
 import TextType from '../components/reactbits/TextType/TextType'
 import { ApiError } from '../lib/api'
 import { WORKSPACE_LABELS } from '../lib/format'
@@ -164,14 +164,8 @@ function Headline({ phrases, colors }: { phrases: string[]; colors: string[] }) 
 
 function Brand() {
   return (
-    <div className="flex items-center gap-3 px-3.5 sm:px-4 lg:px-5">
-      <span className="grid size-11 place-items-center rounded-xl bg-gradient-to-br from-cyan-300 to-accent text-sidebar shadow-lg shadow-cyan-500/20 lg:size-14 lg:rounded-2xl">
-        <Truck className="size-6 lg:size-8" strokeWidth={2.2} aria-hidden />
-      </span>
-      <div>
-        <p className="text-xl leading-tight font-bold lg:text-2xl">LogiTrack</p>
-        <p className="text-sm text-white/75 lg:text-base">Operations Portal</p>
-      </div>
+    <div className="flex items-center px-3.5 sm:px-4 lg:px-5">
+      <Logo variant="full" surface="dark" className="h-12 lg:h-16" />
     </div>
   )
 }

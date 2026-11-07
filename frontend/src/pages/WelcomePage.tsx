@@ -7,6 +7,7 @@ import controlRoomJpg from '../assets/login/maintenance-control-room.jpg'
 import controlRoom480 from '../assets/login/maintenance-control-room-480.webp'
 import controlRoom736 from '../assets/login/maintenance-control-room-736.webp'
 import { useAuth, WORKSPACE_HOME, WORKSPACE_LOGIN } from '../auth/context'
+import { Logo } from '../components/brand/Logo'
 import { WORKSPACE_LABELS } from '../lib/format'
 import type { Workspace } from '../lib/types'
 
@@ -88,14 +89,8 @@ export function WelcomePage() {
         <div className="absolute inset-0 bg-gradient-to-b from-sidebar-deep/55 via-transparent via-40% to-sidebar-deep/95" />
       </div>
 
-      <header className="flex items-center gap-3 px-3.5 pt-3.5 sm:px-4 sm:pt-4 lg:px-5 lg:pt-5">
-        <span className="grid size-11 place-items-center rounded-xl bg-gradient-to-br from-cyan-300 to-accent text-sidebar shadow-lg shadow-cyan-500/20 lg:size-14 lg:rounded-2xl">
-          <Truck className="size-6 lg:size-8" strokeWidth={2.2} aria-hidden />
-        </span>
-        <div>
-          <p className="text-xl leading-tight font-bold lg:text-2xl">LogiTrack</p>
-          <p className="text-sm text-white/80 lg:text-base">Operations Portal</p>
-        </div>
+      <header className="flex items-center px-3.5 pt-3.5 sm:px-4 sm:pt-4 lg:px-5 lg:pt-5">
+        <Logo variant="full" surface="dark" className="h-12 lg:h-16" />
       </header>
 
       <main className="flex flex-1 flex-col items-center justify-center px-5 py-10 sm:px-10">

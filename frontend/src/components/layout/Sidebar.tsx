@@ -1,7 +1,8 @@
 import clsx from 'clsx'
-import { BarChart3, Cog, Truck, X } from 'lucide-react'
+import { BarChart3, Cog, X } from 'lucide-react'
 import { NavLink } from 'react-router'
 import { useAuth, WORKSPACE_HOME } from '../../auth/context'
+import { Logo } from '../brand/Logo'
 import { WORKSPACE_LABELS } from '../../lib/format'
 import type { Workspace } from '../../lib/types'
 import { MAINTENANCE_NAV } from '../../maintenanceNav'
@@ -37,13 +38,10 @@ export function Sidebar({
         )}
       >
         <div className="flex items-center gap-3 px-5 pt-4 pb-4">
-          <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-cyan-300 to-accent text-sidebar shadow-lg">
-            <Truck className="size-7" strokeWidth={2.2} aria-hidden />
-          </span>
-          <div className={clsx('min-w-0', collapsed && 'lg:hidden')}>
-            <p className="text-xl leading-tight font-bold">LogiTrack</p>
-            <p className="text-sm text-white/80">Operations Portal</p>
-          </div>
+          <NavLink to={home} onClick={onClose} className="rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-300">
+            <Logo variant="compact" surface="dark" className={clsx('h-11', collapsed && 'lg:hidden')} />
+            <Logo variant="icon" className={clsx('hidden size-11', collapsed && 'lg:block')} />
+          </NavLink>
           <button
             type="button"
             onClick={onClose}

@@ -1,6 +1,7 @@
-import { ArrowLeft, LockKeyhole, Truck } from 'lucide-react'
+import { ArrowLeft, LockKeyhole } from 'lucide-react'
 import { Link, useLocation } from 'react-router'
 import { SwitchWorkspaceForm } from '../components/account/SwitchWorkspaceForm'
+import { Logo } from '../components/brand/Logo'
 import { WORKSPACE_LABELS } from '../lib/format'
 import type { Workspace } from '../lib/types'
 import { useAuth, WORKSPACE_HOME } from './context'
@@ -20,14 +21,8 @@ export function WorkspaceGate({ target }: { target: Workspace }) {
   return (
     <div className="workspace-gradient flex min-h-screen items-center justify-center px-5 py-10">
       <div className="w-full max-w-md">
-        <div className="mb-6 flex items-center gap-3">
-          <span className="grid size-11 place-items-center rounded-xl bg-gradient-to-br from-cyan-300 to-accent text-sidebar">
-            <Truck className="size-6" aria-hidden />
-          </span>
-          <div>
-            <p className="text-xl leading-tight font-bold text-ink">LogiTrack</p>
-            <p className="text-sm text-ink-muted">Operations Portal</p>
-          </div>
+        <div className="mb-6 flex items-center">
+          <Logo variant="full" surface="light" className="h-12" />
         </div>
         <div className="card p-7 sm:p-9">
           <span className="mb-4 grid size-12 place-items-center rounded-2xl bg-sky-100 text-primary">
